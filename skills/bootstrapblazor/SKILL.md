@@ -9,17 +9,23 @@ description: Use when working with BootstrapBlazor (also called BB, bb, or boots
 
 BootstrapBlazor（BB / bb / bootstrapblazor）组件库的参数 / 事件 / 公开方法，**必须**通过 `bb-llms` CLI 从官方文档获取，**禁止凭记忆臆造 API**。
 
-## 前置依赖（bb-llms 缺失时）
+## 前置依赖检测（硬性第一步，不可跳过）
 
 本技能依赖 `bb-llms` CLI（.NET 全局工具，包名 `BootstrapBlazor.LLMsDocs.Cli`）。
 
-1. 先检测：`Get-Command bb-llms`（Linux/macOS：`which bb-llms`）
-2. 命令不存在 → **停止查文档，不要自行安装、不要臆造 API**，提示用户手动安装：
-   - 需先安装 .NET 10 SDK
-   - 安装：`dotnet tool install -g BootstrapBlazor.LLMsDocs.Cli`
-   - 官方说明：https://github.com/BootstrapBlazor/BootstrapBlazor.Extensions/tree/master/tools/BootstrapBlazor.LLMsDocs.Cli
-   - 装完需重开终端使 PATH 生效
-3. 用户确认装好后，继续本技能流程
+在回答任何 BB API 问题之前，**必须**先验证 `bb-llms` 可用：
+
+1. 运行 `bb-llms --help`（或 `-h`）：
+   - 正常输出 Usage / Commands → CLI 存在且可运行；核对 Commands 列表确认 search / get / list 等子命令名，以实际输出为准
+   - 命令报错（找不到命令 / 非零退出码 / 无输出）→ 视为不可用，**立即停止查文档**
+2. 不可用时按下方「安装引导」提示用户手动安装（需先安装 .NET 10 SDK），装完需重开终端使 PATH 生效
+3. 用户确认装好后，重新执行第 1 步，通过后再继续查文档
+
+### 安装引导
+
+- 安装：`dotnet tool install -g BootstrapBlazor.LLMsDocs.Cli`
+- 官方说明：https://github.com/BootstrapBlazor/BootstrapBlazor.Extensions/tree/master/tools/BootstrapBlazor.LLMsDocs.Cli
+- **不得自行安装、不得凭记忆臆造 API**；安装由用户执行
 
 ## When to Use
 
@@ -52,5 +58,5 @@ BootstrapBlazor（BB / bb / bootstrapblazor）组件库的参数 / 事件 / 公�
 
 - 凭记忆写 API（猜测事件名 / 参数名）→ 一律先用 `bb-llms get` 查证
 - 组件名拼写不确定 → 先 `bb-llms search` 或 `bb-llms list`
-- `bb-llms` 命令不存在 → 见「前置依赖」章节，提示用户安装，勿臆造
+- `bb-llms --help` 报错/无输出 → 视为不可用 → 见「前置依赖检测」章节，提示用户安装，勿臆造
 - CLI 已装但联网/拉取失败（如脱机）→ 用浏览器查 https://www.blazor.zone 官方文档，仍不得臆造
