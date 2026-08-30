@@ -1,8 +1,7 @@
 name: update-readme
 on:
   push:
-    branches: [main]
-    paths: ['skills/**']        # 仅技能变更时触发
+    branches: [main]            # 每次推送 main 都触发
   workflow_dispatch:            # 支持手动触发
 
 permissions:
@@ -10,6 +9,8 @@ permissions:
 
 jobs:
   generate:
+    # 防循环：跳过自动提交（github-actions[bot]）发起的 push
+    if: github.event.head_commit.committer.name != 'github-actions[bot]'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
