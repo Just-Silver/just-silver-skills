@@ -1,12 +1,14 @@
 # Just-Silver Skills
 
-个人自用的 OpenCode 技能集（仅包含自建技能）。
+个人自用的 OpenCode 技能集（仅自建技能）。
 
-## 技能列表
+<!-- AUTO-GENERATED: 技能表格由 scripts\update-readme.ps1 生成，请勿手改 -->
 
-| 技能 | 说明 |
-|------|------|
-| bootstrapblazor | BootstrapBlazor（BB/bb）组件参数/事件/公开方法查询，通过 bb-llms CLI 获取官方文档，禁止臆造 API |
+| 技能 | 介绍 | 跳转位置 |
+|------|------|----------|
+| bootstrapblazor | Use when working with BootstrapBlazor (also called BB, bb, or bootstrapblazor) components and needing their... | [skills/bootstrapblazor/](skills/bootstrapblazor/) |
+
+<!-- /AUTO-GENERATED -->
 
 ## 安装
 
@@ -21,7 +23,8 @@ Copy-Item -Recurse skills/bootstrapblazor "$env:USERPROFILE\.config\opencode\ski
 ## 维护
 
 - 技能结构：`skills/<name>/SKILL.md`（frontmatter：`name` + `description`）
-- 新增自建技能 → 放入 `skills/` 目录 → commit → push（提交信息用中文）
+- 新增/修改技能后：本地跑 `./scripts/update-readme.ps1` 重新生成清单（或由 GitHub Actions 自动生成）
+- commit → push（提交信息用中文）
 
 ## 许可
 
