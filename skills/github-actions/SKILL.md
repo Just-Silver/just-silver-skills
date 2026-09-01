@@ -18,7 +18,28 @@ description: Use when writing, creating, or modifying GitHub Actions workflow fi
 3. **`references/expressions.md`** — 表达式字面量、运算符、函数、状态检查函数
 4. **`references/contexts.md`** — 上下文（`github` / `secrets` / `needs` / `matrix` / `steps` 等）与可用性限制
 
-按需读取；不确定时**回查官方源**（各文件顶部有链接），不得凭记忆补全语法。
+按需读取；不确定时**回查官方源**（见下方「官方资料原文」），不得凭记忆补全语法。
+
+## 官方资料原文
+
+本技能的内容是从 GitHub 官方文档提炼的要点。需要**更详细 / 更完整 / 最新**的资料时，直接访问以下官方原文（均为 docs.github.com 稳定地址）：
+
+| 资料 | 官方原文 URL |
+|------|-------------|
+| **Workflow syntax**（全部语法键） | `https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax` |
+| **Events that trigger workflows**（触发事件与活动类型） | `https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows` |
+| **Expressions**（表达式与函数完整签名） | `https://docs.github.com/en/actions/reference/workflows-and-actions/expressions` |
+| **Contexts**（上下文完整属性） | `https://docs.github.com/en/actions/reference/workflows-and-actions/contexts` |
+| **Workflow commands**（`$GITHUB_OUTPUT` 等） | `https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands` |
+| **Variables reference**（默认环境变量） | `https://docs.github.com/en/actions/reference/workflows-and-actions/variables` |
+| **GITHUB_TOKEN**（权限与用途） | `https://docs.github.com/en/actions/concepts/security/github_token` |
+| **Secrets**（secrets 参考） | `https://docs.github.com/en/actions/reference/security/secrets` |
+| **Reusing workflows**（可复用工作流） | `https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations` |
+| **Actions limits**（限制） | `https://docs.github.com/en/actions/reference/limits` |
+| **Secure use reference**（安全实践） | `https://docs.github.com/en/actions/reference/security/secure-use` |
+| **Actions 文档首页**（全部入口） | `https://docs.github.com/en/actions` |
+
+> 这些地址与各 references 文件顶部标注的「官方源」一致；references 文件是**精炼版**，官方原文是**权威完整版**。两者冲突时以官方原文为准。
 
 ## When to Use
 
