@@ -68,7 +68,7 @@ cat .gitea/workflows/ci.yml | scripts/actionlint.exe -   # stdin 单文件
 - 退出码：`0` 无问题 / `1` 发现问题 / `2` 无效参数 / `3` 致命错误
 - Gitea 额外注意（实测验证）：`${{ gitea.* }}` 报 `undefined variable "gitea"`；**改用 `github.*` 别名（官方确认功能等同）即可直接通过**，或用上方 `-ignore`；详见 gitea-differences.md
 
-**校验流程**：① 先跑 `scripts/update-actionlint.ps1` 保鲜——**每个会话只需执行一次**（懒更新：查上游最新版，有新版自动下载替换；幂等：版本相同跳过；网络失败降级用现有二进制继续）→ ② 再用上方命令校验。版本事实源：`scripts/actionlint.version`（脚本与 CI 都读它；手动替换二进制后需同步更新）。
+**校验流程**：① 先跑 `scripts/update-actionlint.ps1` 保鲜——**不要重复执行，只需执行一次**（懒更新：查上游最新版，有新版自动下载替换；幂等：版本相同跳过；网络失败降级用现有二进制继续）→ ② 再用上方命令校验。版本事实源：`scripts/actionlint.version`（脚本与 CI 都读它；手动替换二进制后需同步更新）。
 
 ## Common Mistakes
 
