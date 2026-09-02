@@ -19,7 +19,7 @@
 | 文件后缀 | `.yml` / `.yaml` | 同 |
 | 是否默认启用 | 开箱即用 | 实例级默认启用 + **仓库级需手动开启**（Settings → Enable Repository Actions） |
 | 执行者 | GitHub-hosted / 自托管 runner | 需自建 Gitea Runner（act 的硬 fork，官方建议与 Gitea 实例分机部署） |
-| `runs-on` | hosted 镜像或自托管 labels | 标签映射到环境：`ubuntu:22.04` 等（注册时可自定义 `label:docker://image` 或 `label:host`） |
+| `runs-on` | hosted 镜像或自托管 labels | 标签映射 job 容器镜像（默认官方 `docker.gitea.com/runner-images:*` 系列，见"job 容器镜像"节；注册时可自定义 `label:docker://image` 或 `label:host`） |
 | 内置 token | `GITHUB_TOKEN`（自动注入环境变量，开箱即用） | `GITEA_TOKEN`（**不裸注入**：仅 `${{ secrets.GITEA_TOKEN }}` 可用，步骤内需显式 env 注入，见下文） |
 
 ## 直接可用的语法（官方确认，放心照抄）
