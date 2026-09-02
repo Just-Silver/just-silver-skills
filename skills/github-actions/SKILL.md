@@ -49,16 +49,30 @@ description: Use when writing, creating, or modifying GitHub Actions or Gitea Ac
 
 ## 校验方法
 
-写完后用 `actionlint` 校验语法（若已安装）：
+写完后用 `actionlint` 校验语法（官方仓库：https://github.com/rhysd/actionlint ，usage 文档：https://github.com/rhysd/actionlint/blob/main/docs/usage.md）。**支持任意文件数量**——单文件、多文件、glob、stdin 均可：
 
 ```bash
-# GitHub
+# 单文件（显式传路径）
+actionlint .github/workflows/ci.yml
+# 多文件 / glob
 actionlint .github/workflows/*.yml
-# Gitea（显式传路径 + 用 github.* 上下文或 -ignore 处理 gitea.* 误报，详见 gitea-differences.md）
+# Gitea workflow（.gitea/workflows/ 不会被自动发现，必须显式传路径）
 actionlint .gitea/workflows/*.yml
+# 无参数：自动发现当前仓库 .github/workflows/ 下全部工作流
+actionlint
+# stdin：从管道读取单个工作流
+cat .gitea/workflows/ci.yml | actionlint -
 ```
 
-未安装时不强行安装，可人工对照 references 检查；最终以实际运行结果为准。
+常用选项：
+
+- `-ignore '正则'`：按错误消息正则过滤（可重复；RE2 语法），如需放行 Gitea act_runner 的 action 版本误报
+- `-color` / `-no-color`：颜色输出
+- `-shellcheck=` / `-pyflakes=`：空串禁用外部检查器（更快）
+- 退出码：`0` 无问题 / `1` 发现问题 / `2` 无效参数 / `3` 致命错误
+- Gitea 额外注意：`${{ gitea.* }}` 会报 `undefined variable`（用 `github.*` 或 `-ignore`），详见 gitea-differences.md
+
+未安装时**不强行安装**：可人工对照 references 检查，或用官方 Docker 镜像（`docker run --rm -v $(pwd):/repo --workdir /repo rhysd/actionlint:latest -color`）或在线 playground（https://rhysd.github.io/actionlint/，浏览器跑 WASM 免安装）。最终以实际运行结果为准。
 
 ## Common Mistakes
 

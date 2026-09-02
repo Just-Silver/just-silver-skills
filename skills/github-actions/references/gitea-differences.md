@@ -66,10 +66,12 @@
 
 ## actionlint 校验（GitHub 与 Gitea 均可用）
 
-actionlint 本身无官方 Gitea 模式，但 Gitea 官方仓库与 act_runner 均依赖它做表达式求值/语法校验（1.28 起为直接依赖）。用法：
+actionlint 本身无官方 Gitea 模式，但 Gitea 官方仓库与 act_runner 均依赖它做表达式求值/语法校验（1.28 起为直接依赖）。支持单文件 / 多文件 / glob / stdin（`-`）任一形态：
 
 ```bash
-# Gitea 工作流（显式传路径，默认只扫 .github/workflows/）
+# 单文件
+actionlint .gitea/workflows/ci.yaml
+# Gitea 全部工作流（显式传路径，默认只扫 .github/workflows/）
 actionlint .gitea/workflows/*.yml
 
 # 已知误报处理：
