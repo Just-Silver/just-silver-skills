@@ -68,13 +68,7 @@
 
 ## job 容器镜像
 
-- 用官方镜像（runner 标签映射，workflow 不写 container）：
-  ```yaml
-  # runner config.yaml / .runner 标签
-  labels:
-    - "ubuntu-latest:docker://docker.gitea.com/runner-images:ubuntu-latest"
-  ```
-- 覆盖场景（workflow 内）：`container: docker.gitea.com/runner-images:ubuntu-latest`（须带完整前缀；裸 `ubuntu:22.04` 无 node，JS action 报 127）
+- 用 `docker.gitea.com/runner-images:ubuntu-latest`
 
 ## 语法支持随版本演进（默认按当前默认版本 1.27 编写，见"版本策略"）
 
