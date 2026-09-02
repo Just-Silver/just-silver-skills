@@ -1,0 +1,33 @@
+name: update-actionlint
+on:
+  schedule:
+    - cron: '0 3 * * 1'        # 每周一 03:00 UTC 轮询上游最新版（最多延迟 1 周；actionlint 约数月发一版）
+  workflow_dispatch:            # 手动触发兜底
+
+permissions:
+  contents: write               # 自动提交更新后的校验器
+
+jobs:
+  update:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: 检查并更新内置校验器（固定更新 Windows amd64 资产，与 runner 平台无关）
+        shell: pwsh
+        run: ./scripts/update-actionlint.ps1 -Platform windows_amd64
+      - name: 有更新则自动提交
+        shell: pwsh
+        run: |
+          # 防循环：只提交 skills/github-actions/scripts/ 下的校验器与版本文件，
+          # 不触碰 .github/workflows/**；会触发 update-readme（paths: skills/**），
+          # 而后者只提交 README.md（不在 skills/** 内）→ 递归终止。
+          git add skills/github-actions/scripts/actionlint.exe skills/github-actions/scripts/actionlint.version
+          if (git diff --cached --quiet) {
+            Write-Output '校验器无更新，跳过提交'
+          } else {
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'chore: 自动更新内置 actionlint 校验器'
+            git push
+            Write-Output '已自动提交并推送'
+          }

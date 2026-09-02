@@ -70,6 +70,12 @@ cat .gitea/workflows/ci.yml | scripts/actionlint.exe -   # stdin 单文件
 
 其他平台 / 其他机器：从官方 release 下载对应资产（https://github.com/rhysd/actionlint/releases/latest ，解压取 `actionlint` / `actionlint.exe`），或官方 Docker 镜像（`docker run --rm -v $(pwd):/repo --workdir /repo rhysd/actionlint:latest -color`），或在线 playground（https://rhysd.github.io/actionlint/ ，浏览器 WASM 免安装）。最终以实际运行结果为准。
 
+### 更新内置校验器（保证版本不落后）
+
+- **使用即检查（懒更新）**：校验前先跑 `scripts/update-actionlint.ps1`——查询上游最新版，有新版自动下载替换（幂等：版本相同跳过；`-Force` 强制重下；`-Platform <资产名>` 指定平台；优先用 gh CLI 查 API，失败回退匿名并能降级继续用现有二进制）
+- **CI 自动轮询**：仓库 `.github/workflows/update-actionlint.yml` 每周一 03:00 UTC 自动比对并提交更新（`workflow_dispatch` 手动兜底）
+- 版本事实源：`scripts/actionlint.version`（脚本与 CI 都读它；升级二进制后需同步更新该文件）
+
 ## Common Mistakes
 
 - **凭记忆写语法**（如 `on` 结构、`steps` 键名）→ 一律先读 references 对应文件
