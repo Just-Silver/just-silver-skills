@@ -88,3 +88,4 @@ cat .gitea/workflows/ci.yml | scripts/actionlint.exe -   # stdin 单文件
 - **fork PR 用 secrets** → fork PR 中除内置 token 外 secrets 不可用
 - **`if` 里字符串 vs 布尔** → `${{ }}` 求值为字符串时注意类型；数字/布尔比较用 `fromJSON()`
 - **contexts 用错位置** → 某些上下文在特定键不可用（如 `secrets` 不能用于 `if`），见 contexts.md 可用性表
+- **用 WebFetch 直接抓 `api.github.com` 查 action 版本** → 必 403（GitHub API 强制 User-Agent + 匿名限流 60 次/时/IP）；用 `gh api repos/<owner>/<repo>/releases/latest --jq .tag_name`（认证 5000 次/时），详见 workflow-syntax.md 常用 action 章节

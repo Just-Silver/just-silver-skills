@@ -111,7 +111,17 @@
 | `actions/cache` | 依赖缓存 | `@v6` | `path`、`key`（常配 `hashFiles()`） |
 | `softprops/action-gh-release` | 创建 GitHub Release | `@v3` | `tag_name`、`name`、`body_path` |
 
-> **升级 action 到新 major 时**：先查该 action 的 release notes 确认参数无破坏性变更。版本号会随时间演进，编写时点后请核实最新 major（本表基于 2026-09 官方 latest）。
+> **升级 action 到新 major 时**：先查该 action 的最新版本与 release notes，确认参数无破坏性变更。查询方式（实测验证）：
+>
+> ```bash
+> # 推荐：gh CLI（已认证，限流 5000 次/时）——不要用 WebFetch 直接抓 api.github.com
+> gh api repos/actions/checkout/releases/latest --jq .tag_name
+> ```
+>
+> - **WebFetch 直接抓 `api.github.com` 必 403**：GitHub API 强制 User-Agent 头（WebFetch 无法自定义）+ 匿名限流仅 60 次/时/IP，实测双 403
+> - 无 gh 的兜底：`curl -H "User-Agent: xxx" https://api.github.com/...`（能过 UA 检查但仍有匿名限流）；或 WebFetch 抓 `https://github.com/<owner>/<repo>/releases/latest`（HTML 页面，绕过 API 限流，从 "Releases vX.Y.Z" 中读版本，噪音大）
+>
+> 版本号会随时间演进，编写时点后请核实最新 major（本表基于 2026-09 官方 latest）。
 
 ### Node.js 项目典型步骤
 
