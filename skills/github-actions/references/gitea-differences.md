@@ -20,7 +20,7 @@
 | 是否默认启用 | 开箱即用 | 实例级默认启用 + **仓库级需手动开启**（Settings → Enable Repository Actions） |
 | 执行者 | GitHub-hosted / 自托管 runner | 需自建 Gitea Runner（act 的硬 fork，官方建议与 Gitea 实例分机部署） |
 | `runs-on` | hosted 镜像或自托管 labels | 标签映射到环境：`ubuntu:22.04` 等（注册时可自定义 `label:docker://image` 或 `label:host`） |
-| 内置 token | `GITHUB_TOKEN` | `GITEA_TOKEN` |
+| 内置 token | `GITHUB_TOKEN`（自动注入环境变量，开箱即用） | `GITEA_TOKEN`（**不裸注入**：仅 `${{ secrets.GITEA_TOKEN }}` 可用，步骤内需显式 env 注入，见下文） |
 
 ## 直接可用的语法（官方确认，放心照抄）
 
@@ -54,6 +54,17 @@
 - **上下文可用性不检查**：`env` 等上下文可用位置比 GitHub 宽松（GitHub 有限制的写法在 Gitea 也能跑，反向迁移时注意）
 - **action 下载源**：非全限定 action（如 `actions/checkout@v4`）默认从 `github.com` 下载脚本；内网实例可配置 `[actions].DEFAULT_ACTIONS_URL = self`（只允许 `github` / `self` 两值），或镜像 action 到本实例后用绝对 URL
 - runner 对多标签 `runs-on: [a, b]` 采用"取第一个匹配"逻辑（不是 GitHub 的 AND 匹配），跨标签需求慎用
+
+## 内置 token 与 CI 回推（实测注意）
+
+- **Gitea 内置 token 不裸注入环境变量**（实测踩坑）：GitHub 的 `GITHUB_TOKEN` 自动出现在 job 环境里；Gitea 的 `GITEA_TOKEN` **只通过 `${{ secrets.GITEA_TOKEN }}` 暴露**——步骤里直接引用裸 `${GITEA_TOKEN}` 得到空值（实测 push 报 `Failed to authenticate user`）。必须显式注入：
+  ```yaml
+  - run: git push "https://oauth2:${GITEA_TOKEN}@<实例>/<owner>/<repo>.git" HEAD:main
+    env:
+      GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+  ```
+- **CI 内回推产物**（自动更新类 workflow）标准写法：`git add` 限定产物目录（如 `docs/`）→ `git diff --cached --quiet` 判空则跳过提交（幂等）→ commit → 用内置 token 的 URL 显式 push。schedule / workflow_dispatch 触发时 checkout 处于 detached HEAD，必须 `git push ... HEAD:main` 显式指定分支
+- `permissions.contents: write` 足够支持回推（对应 Gitea 的 `code: write`）；实际生效权限还受仓库/组织的 MaxTokenPermissions 设置钳制
 
 ## 语法支持随版本演进（默认按当前默认版本 1.27 编写，见"版本策略"）
 
@@ -112,7 +123,7 @@ actionlint -ignore='the runner of "actions/upload-artifact@v3(\.[0-9]+\.[0-9]+)?
 3. `runs-on` 保持单标签/标签列表形式
 4. 表达式函数一律不用（默认 1.27）；仅用户确认实例为 1.28+ 且要求时按版本表启用
 5. `permissions` 移除 GitHub 专属 scope（statuses/checks/deployments/id-token/security-events/pages）
-6. `GITHUB_TOKEN` 相关操作改用 `GITEA_TOKEN`（注意包发布未实现，需 PAT）
+6. `GITHUB_TOKEN` 相关操作改用 `GITEA_TOKEN`（**须 `env: GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}` 显式注入，不裸注入**；包发布未实现需 PAT）
 7. PR 分支判断依赖 `ref == refs/heads/main` 的写法在 Gitea 天然成立，无需改
 8. 内网实例：核对 action 下载源（DEFAULT_ACTIONS_URL / 绝对 URL / 镜像）
 9. 自托管 Windows runner：默认 shell 是 bash，加 `defaults: {run: {shell: powershell}}`
