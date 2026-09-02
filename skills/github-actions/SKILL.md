@@ -14,7 +14,7 @@ description: Use when writing, creating, or modifying GitHub Actions or Gitea Ac
 **0. 第一步：确认目标平台** —— GitHub 还是 Gitea？
 
 - **GitHub** → 读下方 1-4 号 GitHub references
-- **Gitea** → 读下方 1-4 号 GitHub references（共同语法）+ **`references/gitea-differences.md`（必读）** + **必须访问 https://docs.gitea.com/usage/actions/ 核验当前版本差异**（Gitea 语法随版本演进，如表达式函数 1.27 仅 `always()`、1.28 起支持标准函数；本地文件仅是摘要）
+- **Gitea** → 读下方 1-4 号 GitHub references（共同语法）+ **`references/gitea-differences.md`（必读）**。语法策略见该文件"版本策略"小节：**默认按"当前默认版本"（1.27）编写，无需访问官方文档**；实例升级后由维护者更新该文件的默认版本标记；仅当用户明确要求高版本特性（如 1.28 表达式函数）且用户/维护者确认版本后，才按官方文档核验
 
 1. **`references/workflow-syntax.md`** — 顶层键、`on`、`jobs`、`steps`、`permissions`、matrix、job outputs 完整语法
 2. **`references/events.md`** — 触发事件选型、安全注意（`pull_request_target` 风险）、fork PR 限制
@@ -22,7 +22,7 @@ description: Use when writing, creating, or modifying GitHub Actions or Gitea Ac
 4. **`references/contexts.md`** — 上下文（`github` / `secrets` / `needs` / `matrix` / `steps` 等）与可用性限制
 5. **`references/gitea-differences.md`**（仅 Gitea 目标）— 目录 / 事件 / 表达式 / permissions / token / 版本差异清单
 
-按需读取；**GitHub 目标：先本地优先**——references 文件已提炼官方要点，优先从中取信息，不要一上来就抓网页；**Gitea 目标：本地文件仅作起点，必须回查 Gitea 官方文档**（版本差异决定可用语法）。确实不确定时回查各 references 文件**顶部标注的官方源链接**（权威完整版，与本技能冲突时以官方原文为准），不得凭记忆补全语法。
+按需读取；**GitHub 目标：本地优先**——references 文件已提炼官方要点，优先从中取信息，不要一上来就抓网页；**Gitea 目标：默认信任本地文件**——按 gitea-differences.md"版本策略"写当前默认版本（1.27）语法，不访问官方文档；仅当用户明确要求高版本特性且用户/维护者确认版本后回查官方文档。确实不确定时回查各 references 文件**顶部标注的官方源链接**（权威完整版，与本技能冲突时以官方原文为准），不得凭记忆补全语法。
 
 ## When to Use
 
@@ -79,9 +79,9 @@ cat .gitea/workflows/ci.yml | scripts/actionlint.exe -   # stdin 单文件
 ## Common Mistakes
 
 - **凭记忆写语法**（如 `on` 结构、`steps` 键名）→ 一律先读 references 对应文件
-- **Gitea 目标却只查 GitHub references** → Gitea 语法随版本演进，必须读 gitea-differences.md + 访问 Gitea 官方文档核验
+- **Gitea 目标却只查 GitHub references** → 必须读 gitea-differences.md；默认按"版本策略"写当前默认版本（1.27）语法（无需访问官方文档），不要臆造高版本特性
 - **把 GitHub 专属写法套到 Gitea** → `jobs.*.environment` 被忽略、复杂 `runs-on`（`{group:, labels:}` 形式，Gitea 各版本均不支持；1.28+ 支持的是表达式形式）不存在、GitHub 专属 permissions scope（`checks`/`statuses` 等）不存在；token 是 `GITEA_TOKEN` 不是 `GITHUB_TOKEN`
-- **Gitea 1.27 用表达式函数**（`startsWith` / `contains` / `success()` 等）→ 1.27 官方文档仅支持 `always()`；分支/tag 判断改用事件过滤（`tags: ['v*']`）与 `==` 运算符；1.28+ 以官方文档为准
+- **Gitea 1.27 用表达式函数**（`startsWith` / `contains` / `success()` 等）→ 默认（1.27）一律不用表达式函数（官方文档仅支持 `always()`）；分支/tag 判断用事件过滤（`tags: ['v*']`）与 `==` 运算符；仅用户/维护者确认实例为 1.28+ 且要求时才启用标准函数
 - **`pull_request_target` 滥用** → 会授予 fork PR 写权限，除非确需基仓 secrets 否则用 `pull_request`
 - **忘记 `permissions` 最小化** → 指定任一权限后未指定的全为 `none`，明确声明需要的
 - **tag 触发的 workflow 里 `git push`** → checkout 处于 detached HEAD，必须 `git push origin HEAD:main`
