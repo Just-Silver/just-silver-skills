@@ -64,6 +64,28 @@
 
 - 结论：**v1.27 目标仓库默认不用函数**；目标实例为 1.28+ 时以 https://docs.gitea.com/next/usage/actions/comparison/ 当前内容为准。不确定时优先用运算符/事件过滤，并在交付前核验实例版本
 
+### 核验实例真实版本（最优先方式，端点公开免认证）
+
+```bash
+# 直接查【目标实例】实际运行的版本——必须是目标实例自己的地址，与 gitea.com 官方实例无关
+curl -s http://<你的实例地址:端口>/api/v1/version
+# 例: curl -s http://192.168.8.8:3000/api/v1/version
+# → {"version":"1.27.3"} / {"version":"1.28.0+dev-..."}；或 WebFetch 同一地址（纯 JSON 单值）
+```
+
+- 拿到实例版本后对照上表判定可用语法（例：1.27.x → 表达式函数仅 `always()`；1.28.x → 标准函数可用）
+- **API 不可达时的降级顺序**（个人/公司自部署实例常见）：
+  1. 问维护者实例版本（一条消息成本最低）
+  2. 按安装渠道推断（docker-compose 镜像 tag、发行包版本、实例页脚显示的版本号——Gitea Web 页脚会显示版本）
+  3. **完全不可知 → 写"版本无关"安全写法**：只用两版本交集——`==`/`&&` 运算符、事件过滤（`tags: ['v*']`）、单 label `runs-on`、`contents: read`、不用 `environment`、不用表达式函数、不用复杂/表达式 runs-on——1.27 与 1.28 均可运行
+- **注意**：gitea-mcp 的 `get_gitea_mcp_server_version` 返回的是 MCP 插件自身版本（如 1.7.0），**不是** Gitea 实例版本，不能用于判断语法支持
+
+### 语法兼容性取决于实例版本，而非 runner 版本（官方文档确认）
+
+- Gitea 实例负责**解析 workflow、求值表达式、展开 matrix/runs-on、调度 job**——runner 拉取的是解析后的任务而非 YAML 文件。因此"哪些语法可用"（键、事件、表达式函数、runs-on 形式、permissions scope）**只取决于实例版本**（1.27 仅 `always()`、1.28 起集成 actionlint 求值，均为实例侧能力）
+- Gitea Runner 与实例**独立发版**，只负责执行层（容器/宿主机步骤、action 下载、日志流）。官方兼容要求：实例 ≥ 1.21（旧实例不接受 runner 标签声明）；runner 2.0.0 / 3.0.0 有 breaking changes（升级前看官方 Upgrading 指南）
+- 实践：判断语法 → 查实例版本（`/api/v1/version`）；判断某 action 能否执行（如 v7 系列要求 Node 24 运行时）→ 看 runner 与镜像版本
+
 ## actionlint 校验（GitHub 与 Gitea 均可用）
 
 actionlint 本身无官方 Gitea 模式，但 Gitea 官方仓库与 act_runner 均依赖它做表达式求值/语法校验（1.28 起为直接依赖）。支持单文件 / 多文件 / glob / stdin（`-`）任一形态：
