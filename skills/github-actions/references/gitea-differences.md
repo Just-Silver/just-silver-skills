@@ -74,10 +74,11 @@ actionlint .gitea/workflows/ci.yaml
 # Gitea 全部工作流（显式传路径，默认只扫 .github/workflows/）
 actionlint .gitea/workflows/*.yml
 
-# 已知误报处理：
-# 1) ${{ gitea.* }} → undefined variable "gitea"：改用 github.*（官方确认功能等同）或 -ignore
+# 已知误报处理（实测验证）：
+# 1) ${{ gitea.* }} → undefined variable "gitea"：改用 github.*（官方确认功能等同，实测直接通过），
+#    或 -ignore 'undefined variable "gitea"'
 # 2) runner 过旧类误报（如 Gitea act_runner 仍用 upload-artifact@v3）：
-actionlint -ignore='the runner of "actions/upload-artifact@v3(\.[0-9]+\.[0-9]+)?" action is too old to run on GitHub Actions' .gitea/workflows/*.yml
+scripts/actionlint.exe -ignore='the runner of "actions/upload-artifact@v3(\.[0-9]+\.[0-9]+)?" action is too old to run on GitHub Actions' .gitea/workflows/*.yml
 ```
 
 - actionlint 版本升级可能引入新规则导致误报（Gitea 官方即因此锁定版本），CI 中建议固定版本

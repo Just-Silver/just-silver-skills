@@ -49,30 +49,26 @@ description: Use when writing, creating, or modifying GitHub Actions or Gitea Ac
 
 ## 校验方法
 
-写完后用 `actionlint` 校验语法（官方仓库：https://github.com/rhysd/actionlint ，usage 文档：https://github.com/rhysd/actionlint/blob/main/docs/usage.md）。**支持任意文件数量**——单文件、多文件、glob、stdin 均可：
+写完后用 `actionlint` 校验语法。**本技能内置校验器**：`scripts/actionlint.exe`（Windows amd64，v1.7.12，官方 release 二进制，已实测）。支持**任意文件数量**——单文件、多文件、glob、stdin 均可：
 
 ```bash
-# 单文件（显式传路径）
-actionlint .github/workflows/ci.yml
-# 多文件 / glob
-actionlint .github/workflows/*.yml
-# Gitea workflow（.gitea/workflows/ 不会被自动发现，必须显式传路径）
-actionlint .gitea/workflows/*.yml
-# 无参数：自动发现当前仓库 .github/workflows/ 下全部工作流
-actionlint
-# stdin：从管道读取单个工作流
-cat .gitea/workflows/ci.yml | actionlint -
+# 内置校验器（相对技能目录；Windows 平台）
+scripts/actionlint.exe .github/workflows/ci.yml          # 单文件
+scripts/actionlint.exe .github/workflows/*.yml           # glob
+scripts/actionlint.exe .gitea/workflows/ci.yaml          # Gitea（.gitea/ 不会被自动发现，必须显式路径）
+scripts/actionlint.exe                                   # 无参数：自动发现 .github/workflows/
+cat .gitea/workflows/ci.yml | scripts/actionlint.exe -   # stdin 单文件
 ```
 
 常用选项：
 
-- `-ignore '正则'`：按错误消息正则过滤（可重复；RE2 语法），如需放行 Gitea act_runner 的 action 版本误报
+- `-ignore '正则'`：按错误消息正则过滤（可重复；RE2 语法）。Gitea `${{ gitea.* }}` 误报实测用法：`-ignore 'undefined variable "gitea"'`
 - `-color` / `-no-color`：颜色输出
 - `-shellcheck=` / `-pyflakes=`：空串禁用外部检查器（更快）
 - 退出码：`0` 无问题 / `1` 发现问题 / `2` 无效参数 / `3` 致命错误
-- Gitea 额外注意：`${{ gitea.* }}` 会报 `undefined variable`（用 `github.*` 或 `-ignore`），详见 gitea-differences.md
+- Gitea 额外注意（实测验证）：`${{ gitea.* }}` 报 `undefined variable "gitea"`；**改用 `github.*` 别名（官方确认功能等同）即可直接通过**，或用上方 `-ignore`；详见 gitea-differences.md
 
-未安装时**不强行安装**：可人工对照 references 检查，或用官方 Docker 镜像（`docker run --rm -v $(pwd):/repo --workdir /repo rhysd/actionlint:latest -color`）或在线 playground（https://rhysd.github.io/actionlint/，浏览器跑 WASM 免安装）。最终以实际运行结果为准。
+其他平台 / 其他机器：从官方 release 下载对应资产（https://github.com/rhysd/actionlint/releases/latest ，解压取 `actionlint` / `actionlint.exe`），或官方 Docker 镜像（`docker run --rm -v $(pwd):/repo --workdir /repo rhysd/actionlint:latest -color`），或在线 playground（https://rhysd.github.io/actionlint/ ，浏览器 WASM 免安装）。最终以实际运行结果为准。
 
 ## Common Mistakes
 
