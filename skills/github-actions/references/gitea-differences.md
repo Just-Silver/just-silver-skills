@@ -66,6 +66,20 @@
 - **CI 内回推产物**（自动更新类 workflow）标准写法：`git add` 限定产物目录（如 `docs/`）→ `git diff --cached --quiet` 判空则跳过提交（幂等）→ commit → 用内置 token 的 URL 显式 push。schedule / workflow_dispatch 触发时 checkout 处于 detached HEAD，必须 `git push ... HEAD:main` 显式指定分支
 - `permissions.contents: write` 足够支持回推（对应 Gitea 的 `code: write`）；实际生效权限还受仓库/组织的 MaxTokenPermissions 设置钳制
 
+## job 容器镜像（实测踩坑）
+
+- **`container:` 指定的镜像照字面使用**：Gitea runner 的 Docker 模式不会为 job 容器注入额外工具链。裸 Docker Hub `ubuntu:22.04` 没有 `node`/`git`/`curl`——Node 写的 action（`actions/checkout@v4` 等）直接失败：`exec: "node": executable file not found in $PATH`（退出码 127，实测）
+- **官方镜像体系**（[gitea/runner-images](https://gitea.com/gitea/runner-images)，基于 `catthehacker/ubuntu:act-*`）：`docker.gitea.com/runner-images:ubuntu-latest|ubuntu-24.04|ubuntu-22.04`（**默认档**，含 node/git/curl/apt 等大多数工具，官方推荐）；`*-slim`（node:20-bookworm-slim 底，仅基础工具）；`*-full`（GitHub Actions 全量工具，仅 amd64，体积大）
+- **推荐写法**：
+  ```yaml
+  runs-on: ubuntu-latest
+  container: docker.gitea.com/runner-images:ubuntu-22.04   # 勿用裸 ubuntu:22.04
+  ```
+  或迁移 runner 标签（官方迁移配置，workflow 无需再写 container）：`labels: - "ubuntu-latest:docker://docker.gitea.com/runner-images:ubuntu-latest"`（config.yaml + 重启 runner，另设 `container.force_pull: true`）
+- **官方文档原文**（runner labels 页）："The default images are small; a job that installs a toolchain on every run is usually better served by a purpose-built image"
+- 实例无法访问 docker.gitea.com 时：用 Docker Hub 同源镜像 `catthehacker/ubuntu:act-22.04`，或自建镜像
+- 查 runner 实情（无管理员 UI 时可）：每次 run 的 job 日志开头三组——`Runner Information`（标签）/ `Operating System`（主机系统）/ `Starting job container`（job 实际镜像）——例：`actions_run_read → get_job_log_preview`
+
 ## 语法支持随版本演进（默认按当前默认版本 1.27 编写，见"版本策略"）
 
 | 能力 | 1.27（当前主流稳定版） | 1.28+（next 文档） |
