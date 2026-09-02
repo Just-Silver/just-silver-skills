@@ -2,13 +2,13 @@
 
 > 官方源：https://docs.gitea.com/usage/actions/（comparison / faq / quickstart / design 页面）
 > 本文件是同一技能内 GitHub references 的 **Gitea 补充差异文件**；GitHub 侧语法详见同目录其余文件。
-> **维护模式**：本技能为个人自用，差异文件由**维护者（用户本人）手动更新**——Gitea 实例升级后，维护者更新本文件"当前默认版本"标记与版本演进表即可，Agent 无需也不应访问官方文档核验。
-> **版本声明**：Gitea 的语法支持**随版本演进**（例如表达式函数 1.27 仅 `always()`，1.28 起支持标准 GitHub 函数）。本文件标注了 1.27（主流稳定版）与 1.28+ 的变化。**默认按"当前默认版本"（1.27）的语法编写**，不依赖实例探测与官方文档核验（见下文"版本策略"）。
+> **维护模式**：Agent 无需也不应访问官方文档核验版本差异；实例升级后的文档更新由维护者负责。
+> **版本声明**：语法能力随版本演进（1.27 仅 `always()`，1.28+ 起支持标准 GitHub 函数），默认按"当前默认版本"（1.27）编写；能力明细见下文"版本演进表"与"版本策略"。
 
 ## 第一步：确认目标平台（硬性）
 
 - **GitHub** → 用本目录 GitHub references（workflow-syntax / events / expressions / contexts）
-- **Gitea** → 本文件 **必读**；语法按"版本策略"小节处理：**默认按"当前默认版本"（1.27）编写，无需访问官方文档**；仅当用户明确要求高版本特性（如 1.28 表达式函数）且用户/维护者确认版本后，才按 https://docs.gitea.com/usage/actions/ 当前内容核验
+- **Gitea** → 本文件 **必读**；语法按"版本策略"小节处理：**默认按"当前默认版本"（1.27）编写，无需访问官方文档**；用户要求高版本特性（如 1.28 表达式函数）时向用户确认版本，按本文件版本演进表编写
 - 两平台语法重叠度约 95%，大多数 workflow 骨架可直接互相迁移；差异集中在本文列出的点上
 
 ## 基本事实与文件位置
@@ -17,7 +17,7 @@
 |----|--------|-------|
 | 工作流目录 | `.github/workflows/` | `.gitea/workflows/`（官方推荐；`.github/workflows/` 也识别，仅作迁移回退，两处勿放同一工作流） |
 | 文件后缀 | `.yml` / `.yaml` | 同 |
-| 是否默认启用 | 开箱即用 | 实例级默认启用（1.21+，1.21 前需 `[actions] ENABLED=true`）+ **仓库级需手动开启**（Settings → Enable Repository Actions） |
+| 是否默认启用 | 开箱即用 | 实例级默认启用 + **仓库级需手动开启**（Settings → Enable Repository Actions） |
 | 执行者 | GitHub-hosted / 自托管 runner | 需自建 Gitea Runner（act 的硬 fork，官方建议与 Gitea 实例分机部署） |
 | `runs-on` | hosted 镜像或自托管 labels | 标签映射到环境：`ubuntu:22.04` 等（注册时可自定义 `label:docker://image` 或 `label:host`） |
 | 内置 token | `GITHUB_TOKEN` | `GITEA_TOKEN` |
@@ -41,7 +41,7 @@
 | 项 | Gitea 行为 | 替代方案 |
 |----|-----------|---------|
 | `jobs.<job_id>.environment`（部署环境） | **忽略** | 用 `if` + 手动映射环境名 |
-| 复杂 `runs-on`（`runs-on: {group:, labels:}` 形式） | 始终不支持 | 1.27：仅 `runs-on: xyz` / `[xyz]`；1.28+：额外支持表达式形式（`runs-on: ${{ 条件 && 'ubuntu-latest' \|\| 'self-hosted' }}` 及含表达式的数组） |
+| 复杂 `runs-on`（`runs-on: {group:, labels:}` 形式） | 始终不支持 | 1.27 仅静态/标签数组；1.28+ 支持表达式形式（见版本演进表） |
 | 表达式**函数**（1.27 版） | 官方文档：仅 `always()` 受支持（限制针对**函数**） | `==`/`!=`/`&&`/`\|\|`/`!` 运算符、上下文插值（`${{ gitea.ref }}`）、字符串/布尔字面量均**可用**（官方 FAQ 与 quickstart 示例证实），勿因函数限制过度规避全部 `${{ }}`；分支/标签判断优先事件过滤（`tags: ['v*']`）；1.28+ 已支持标准函数（见下文） |
 | `permissions` 的 GitHub 专属 scope | 不支持 `statuses` / `checks` / `deployments` / `id-token` / `security-events` / `pages` | 用 Gitea 专属 scope：`code` / `releases` / `wiki` / `projects`；其余（`contents` 等）通用 |
 | Problem Matchers、错误注解 workflow 命令 | 忽略 | 无替代（不影响执行） |
@@ -63,9 +63,7 @@
 | `runs-on` | 仅静态字符串或标签数组 | 额外支持字符串表达式（`runs-on: ${{ 条件 && 'ubuntu-latest' \|\| 'self-hosted' }}`）与含表达式的数组（`[linux, "${{ ... }}"]`）；`{group:, labels:}` 形式仍不支持 |
 | 表达式运算符/插值 | 可用（`==`、`&&`、`${{ gitea.ref }}`） | 可用 |
 
-- 结论（版本策略）：**默认按 1.27 编写：不用表达式函数、不用复杂/表达式 runs-on、不用 `environment`**——1.27 写法在 1.28+ 上也完全兼容（1.28 是能力超集）；仅当维护者已声明默认升级到 1.28+（或用户明确目标实例是 1.28+）时，才对照上表启用高版本语法
-
-### 版本策略（默认按 1.27 编写，升级由维护者声明）
+### 版本策略（默认按 1.27 编写）
 
 > **当前默认版本：1.27**（维护者升级 Gitea 实例后更新此标记，如改为 1.28）
 
@@ -75,32 +73,21 @@
 - 用事件过滤（`tags: ['v*']`）、`==`/`&&`/`!` 运算符、上下文插值（`${{ gitea.ref }}`）、单 label 或静态字符串 `runs-on`、`contents: read`
 - 1.27 写法在 1.28+ 上完全兼容（1.28 是能力超集），实例升级后存量 workflow 无需改动
 
-**【升级流程（维护者操作）】Gitea 实例升级到 1.28+ 后**，维护者只需更新一处标记即可——1.28 的新能力（表达式函数、表达式 runs-on）已预置在本文件版本演进表中，无需其他改动：
-
-1. 更新上方"当前默认版本"标记：1.27 → 1.28
-2. 之后新写 workflow 即按新默认版本自动启用高版本语法；存量 1.27 workflow 无需任何改动（1.28 是超集）
-
 **【目标版本 ≠ 默认版本】仅当用户明确要求高版本特性（如 1.28 表达式函数）时**才有必要确认真实版本——**版本事实必须来自用户/维护者**：
 
 - 用户没说版本 → **直接询问用户**（一条消息成本最低），**不得自行探测、不得访问官方文档核验、不得臆造**
-- 用户/维护者告知或确认版本后 → 对照上表判定可用语法（例：1.27.x → 表达式函数仅 `always()`；1.28.x → 标准函数可用），必要时才按官方文档核验具体语法
+- 用户/维护者告知或确认版本后 → 对照版本演进表判定可用语法（例：1.27.x → 表达式函数仅 `always()`；1.28.x → 标准函数可用）
 - 用户无法确认版本 → 按"当前默认版本"（1.27）编写并告知限制
-- 用户/维护者自查途径：安装渠道（docker-compose 镜像 tag、发行包版本、实例页脚显示的版本号——Gitea Web 页脚会显示版本）；实例端点已提供时可直查：
-  ```bash
-  curl -s http://<你的实例地址:端口>/api/v1/version
-  # → {"version":"1.27.3"} / {"version":"1.28.0+dev-..."}；或 WebFetch 同一地址（纯 JSON 单值）
-  ```
-- **注意**：gitea-mcp 的 `get_gitea_mcp_server_version` 返回的是 MCP 插件自身版本（如 1.7.0），**不是** Gitea 实例版本，不能用于判断语法支持
 
 ### 语法兼容性取决于实例版本，而非 runner 版本（官方文档确认）
 
 - Gitea 实例负责**解析 workflow、求值表达式、展开 matrix/runs-on、调度 job**——runner 拉取的是解析后的任务而非 YAML 文件。因此"哪些语法可用"（键、事件、表达式函数、runs-on 形式、permissions scope）**只取决于实例版本**（1.27 仅 `always()`、1.28 起集成 actionlint 求值，均为实例侧能力）
-- Gitea Runner 与实例**独立发版**，只负责执行层（容器/宿主机步骤、action 下载、日志流）。官方兼容要求：实例 ≥ 1.21（旧实例不接受 runner 标签声明）；runner 2.0.0 / 3.0.0 有 breaking changes（升级前看官方 Upgrading 指南）
-- 实践：判断语法 → 查实例版本（`/api/v1/version`）；判断某 action 能否执行（如 v7 系列要求 Node 24 运行时）→ 看 runner 与镜像版本
+- Gitea Runner 与实例**独立发版**，只负责执行层（容器/宿主机步骤、action 下载、日志流）——语法兼容性只看实例版本，不看 runner
+- 实践：语法支持与否 → 看目标实例版本（由用户/维护者确认）；action 能否执行（如 v7 系列要求 Node 24 运行时）→ 看 runner 与镜像版本
 
 ## actionlint 校验（GitHub 与 Gitea 均可用）
 
-actionlint 本身无官方 Gitea 模式，但 Gitea 官方仓库与 act_runner 均依赖它做表达式求值/语法校验（1.28 起为直接依赖）。支持单文件 / 多文件 / glob / stdin（`-`）任一形态：
+actionlint 可校验 Gitea workflow（自身无 Gitea 模式，按 GitHub 语法近似校验），支持单文件 / 多文件 / glob / stdin（`-`）任一形态：
 
 ```bash
 # 单文件
@@ -108,14 +95,14 @@ actionlint .gitea/workflows/ci.yaml
 # Gitea 全部工作流（显式传路径，默认只扫 .github/workflows/）
 actionlint .gitea/workflows/*.yml
 
-# 已知误报处理（实测验证）：
-# 1) ${{ gitea.* }} → undefined variable "gitea"：改用 github.*（官方确认功能等同，实测直接通过），
+# 已知误报处理：
+# 1) ${{ gitea.* }} → undefined variable "gitea"：改用 github.*（官方确认功能等同）直接通过，
 #    或 -ignore 'undefined variable "gitea"'
-# 2) runner 过旧类误报（如 Gitea act_runner 仍用 upload-artifact@v3）：
-scripts/actionlint.exe -ignore='the runner of "actions/upload-artifact@v3(\.[0-9]+\.[0-9]+)?" action is too old to run on GitHub Actions' .gitea/workflows/*.yml
+# 2) runner 过旧类误报：
+actionlint -ignore='the runner of "actions/upload-artifact@v3(\.[0-9]+\.[0-9]+)?" action is too old to run on GitHub Actions' .gitea/workflows/*.yml
 ```
 
-- actionlint 版本升级可能引入新规则导致误报（Gitea 官方即因此锁定版本），CI 中建议固定版本
+- actionlint 版本升级可能引入新规则导致误报，CI 中建议固定版本
 - 绝对 URL 的 `uses: https://...` 不会被纯语法检查报错（仅 `actions` 附加规则在执行时检查）
 
 ## 从 GitHub 迁移到 Gitea 的检查清单

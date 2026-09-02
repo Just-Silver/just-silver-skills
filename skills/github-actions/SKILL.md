@@ -14,7 +14,7 @@ description: Use when writing, creating, or modifying GitHub Actions or Gitea Ac
 **0. 第一步：确认目标平台** —— GitHub 还是 Gitea？
 
 - **GitHub** → 读下方 1-4 号 GitHub references
-- **Gitea** → 读下方 1-4 号 GitHub references（共同语法）+ **`references/gitea-differences.md`（必读）**。语法策略见该文件"版本策略"小节：**默认按"当前默认版本"（1.27）编写，无需访问官方文档**；实例升级后由维护者更新该文件的默认版本标记；仅当用户明确要求高版本特性（如 1.28 表达式函数）且用户/维护者确认版本后，才按官方文档核验
+- **Gitea** → 读下方 1-4 号 GitHub references（共同语法）+ **`references/gitea-differences.md`（必读）**。语法策略见该文件"版本策略"小节：**默认按"当前默认版本"（1.27）编写，无需访问官方文档**；用户要求高版本特性（如 1.28 表达式函数）时向用户确认版本，按本地版本演进表编写
 
 1. **`references/workflow-syntax.md`** — 顶层键、`on`、`jobs`、`steps`、`permissions`、matrix、job outputs 完整语法
 2. **`references/events.md`** — 触发事件选型、安全注意（`pull_request_target` 风险）、fork PR 限制
@@ -22,7 +22,7 @@ description: Use when writing, creating, or modifying GitHub Actions or Gitea Ac
 4. **`references/contexts.md`** — 上下文（`github` / `secrets` / `needs` / `matrix` / `steps` 等）与可用性限制
 5. **`references/gitea-differences.md`**（仅 Gitea 目标）— 目录 / 事件 / 表达式 / permissions / token / 版本差异清单
 
-按需读取；**GitHub 目标：本地优先**——references 文件已提炼官方要点，优先从中取信息，不要一上来就抓网页；**Gitea 目标：默认信任本地文件**——按 gitea-differences.md"版本策略"写当前默认版本（1.27）语法，不访问官方文档；仅当用户明确要求高版本特性且用户/维护者确认版本后回查官方文档。确实不确定时回查各 references 文件**顶部标注的官方源链接**（权威完整版，与本技能冲突时以官方原文为准），不得凭记忆补全语法。
+按需读取；**GitHub 目标：本地优先**——references 文件已提炼官方要点，优先从中取信息，不要一上来就抓网页；**Gitea 目标：默认信任本地文件**——按 gitea-differences.md"版本策略"写当前默认版本（1.27）语法，不访问官方文档。确实不确定时回查各 references 文件**顶部标注的官方源链接**（权威完整版，与本技能冲突时以官方原文为准），不得凭记忆补全语法。
 
 ## When to Use
 
@@ -51,8 +51,6 @@ description: Use when writing, creating, or modifying GitHub Actions or Gitea Ac
 
 写完后用 `actionlint` 校验语法。**本技能内置校验器**：`scripts/actionlint.exe`（Windows amd64，v1.7.12，官方 release 二进制，已实测）。支持**任意文件数量**——单文件、多文件、glob、stdin 均可：
 
-**使用前先保鲜（懒更新）**：校验前先跑 `scripts/update-actionlint.ps1`——查询上游最新版，有新版自动替换（幂等：版本相同跳过；`-Force` 强制重下；`-Platform <资产名>` 指定平台；优先用 gh CLI 查 API，失败回退匿名并降级继续用现有二进制，不阻断校验）。版本记录在 `scripts/actionlint.version`（手动替换二进制后需同步更新该文件）。
-
 ```bash
 # 内置校验器（相对技能目录；Windows 平台）
 scripts/actionlint.exe .github/workflows/ci.yml          # 单文件
@@ -70,7 +68,7 @@ cat .gitea/workflows/ci.yml | scripts/actionlint.exe -   # stdin 单文件
 - 退出码：`0` 无问题 / `1` 发现问题 / `2` 无效参数 / `3` 致命错误
 - Gitea 额外注意（实测验证）：`${{ gitea.* }}` 报 `undefined variable "gitea"`；**改用 `github.*` 别名（官方确认功能等同）即可直接通过**，或用上方 `-ignore`；详见 gitea-differences.md
 
-其他平台 / 其他机器：从官方 release 下载对应资产（https://github.com/rhysd/actionlint/releases/latest ，解压取 `actionlint` / `actionlint.exe`），或官方 Docker 镜像（`docker run --rm -v $(pwd):/repo --workdir /repo rhysd/actionlint:latest -color`），或在线 playground（https://rhysd.github.io/actionlint/ ，浏览器 WASM 免安装）。最终以实际运行结果为准。
+**校验流程**：① 先跑 `scripts/update-actionlint.ps1` 保鲜——**每个会话只需执行一次**（懒更新：查上游最新版，有新版自动下载替换；幂等：版本相同跳过；网络失败降级用现有二进制继续）→ ② 再用上方命令校验。版本事实源：`scripts/actionlint.version`（脚本与 CI 都读它；手动替换二进制后需同步更新）。
 
 ## Common Mistakes
 
@@ -84,4 +82,3 @@ cat .gitea/workflows/ci.yml | scripts/actionlint.exe -   # stdin 单文件
 - **fork PR 用 secrets** → fork PR 中除内置 token 外 secrets 不可用
 - **`if` 里字符串 vs 布尔** → `${{ }}` 求值为字符串时注意类型；数字/布尔比较用 `fromJSON()`
 - **contexts 用错位置** → 某些上下文在特定键不可用（如 `secrets` 不能用于 `if`），见 contexts.md 可用性表
-- **用 WebFetch 直接抓 `api.github.com` 查 action 版本** → 必 403（GitHub API 强制 User-Agent + 匿名限流 60 次/时/IP）；用 `gh api repos/<owner>/<repo>/releases/latest --jq .tag_name`（认证 5000 次/时），详见 workflow-syntax.md 常用 action 章节

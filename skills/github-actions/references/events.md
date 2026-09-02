@@ -9,7 +9,7 @@
 |------|------|---------------------|
 | `push` | 推送到分支或 tag | `branches` / `tags` / `paths` 过滤；tag 推送可用 `tags: ['v*']` |
 | `pull_request` | PR 活动 | 默认 `opened` / `synchronize` / `reopened`；合并后 `closed` + `github.event.pull_request.merged` 判断 |
-| `pull_request_target` | PR 且需基仓 secrets/权限 | **安全风险高**：来自 fork 的 PR 也会用基仓的写权限 token，慎用，见安全章节 |
+| `pull_request_target` | PR 且需基仓 secrets/权限 | **安全风险高**：来自 fork 的 PR 也会用基仓的写权限 token，慎用，见下文「关键安全注意」 |
 | `workflow_dispatch` | 手动触发 | 支持 `inputs`；仅默认分支上的文件触发 |
 | `schedule` | 定时 | POSIX cron，最短 5 分钟 |
 | `workflow_call` | 可复用工作流被调用 | 定义 `inputs`/`outputs`/`secrets` |
@@ -43,4 +43,3 @@
 - `on.<event>.types`：只监听特定活动（如 `issues.types: [opened]`）
 - `branches` / `paths` / `tags` 过滤器仅对特定事件可用（`push`/`pull_request`/`pull_request_target` 支持 `paths`）
 - 多个事件同时满足会触发**多次**运行（如同时 push + 打开带 label 的 issue）
-- `paths` 过滤注意：PR 用 three-dot diff（head 相对 base 分支的差异），push 用 two-dot

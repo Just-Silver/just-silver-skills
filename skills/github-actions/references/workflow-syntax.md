@@ -95,7 +95,7 @@
 ### Job outputs 传递
 
 - 定义：`jobs.<id>.outputs.<name>: ${{ steps.<step_id>.outputs.<output_name> }}`
-- step 写输出：`echo "name=value" >> $GITHUB_OUTPUT`
+- step 写输出：见下文"写 job output 的标准方式"
 - 跨 job 引用：`${{ needs.<job_id>.outputs.<output_name> }}`
 
 ## 常用 action 与版本提示
@@ -111,30 +111,7 @@
 | `actions/cache` | 依赖缓存 | `@v6` | `path`、`key`（常配 `hashFiles()`） |
 | `softprops/action-gh-release` | 创建 GitHub Release | `@v3` | `tag_name`、`name`、`body_path` |
 
-> **升级 action 到新 major 时**：先查该 action 的最新版本与 release notes，确认参数无破坏性变更。查询方式（实测验证）：
->
-> ```bash
-> # 推荐：gh CLI（已认证，限流 5000 次/时）——不要用 WebFetch 直接抓 api.github.com
-> gh api repos/actions/checkout/releases/latest --jq .tag_name
-> ```
->
-> - **WebFetch 直接抓 `api.github.com` 必 403**：GitHub API 强制 User-Agent 头（WebFetch 无法自定义）+ 匿名限流仅 60 次/时/IP，实测双 403
-> - 无 gh 的兜底：`curl -H "User-Agent: xxx" https://api.github.com/...`（能过 UA 检查但仍有匿名限流）；或 WebFetch 抓 `https://github.com/<owner>/<repo>/releases/latest`（HTML 页面，绕过 API 限流，从 "Releases vX.Y.Z" 中读版本，噪音大）
->
-> 版本号会随时间演进，编写时点后请核实最新 major（本表基于 2026-09 官方 latest）。
-
-### Node.js 项目典型步骤
-
-```yaml
-steps:
-  - uses: actions/checkout@v7
-  - uses: actions/setup-node@v7
-    with:
-      node-version: ${{ matrix.node }}   # 或固定 '20'
-  - run: npm ci                          # 安装依赖（需 package-lock.json；无 lock 文件用 npm install）
-  - run: npm test                        # 跑测试
-  - run: npm run build                   # 构建
-```
+> **升级 action 到新 major 时**：先确认最新版本与 release notes——`gh api repos/<owner>/<repo>/releases/latest --jq .tag_name`，并核对参数无破坏性变更。
 
 ### 写 job output 的标准方式
 
@@ -148,7 +125,7 @@ echo "name=value" >> $GITHUB_OUTPUT
 
 - **tag 触发时 checkout 处于 detached HEAD**：`actions/checkout@v7` 检出 tag 指向的提交，不在分支上。此时若需 `git push` 回仓库，必须 `git push origin HEAD:main`（显式指定分支），否则报 `fatal: You are not currently on a branch`
 - `run-name`、`concurrency`、`env`、`if` 等位置可用的上下文有严格限制（见 contexts.md）
-- 表达式 `${{ }}` 中字符串必须单引号；`if` 里布尔上下文注意字符串 vs 布尔转换
+- `if` 里布尔上下文注意字符串 vs 布尔转换（字符串须单引号，见 expressions.md）
 
 ## 完整示例：CI workflow（可照抄骨架）
 
