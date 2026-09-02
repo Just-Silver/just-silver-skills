@@ -1,6 +1,6 @@
 ---
 name: github-actions
-description: Use when writing, creating, or modifying GitHub Actions or Gitea Actions workflow files (.github/workflows/*.yml or .gitea/workflows/*.yml), choosing trigger events (push, pull_request, schedule, workflow_dispatch), using expressions/contexts in workflows, or unsure about Actions workflow syntax on either platform — before writing or editing any workflow YAML. Never invent workflow syntax from memory; consult the official references here first.
+description: Use when writing, creating, or modifying GitHub Actions or Gitea Actions workflow files (.github/workflows/*.yml or .gitea/workflows/*.yml), choosing trigger events (push, pull_request, schedule, workflow_dispatch), using expressions/contexts in workflows, or unsure about Actions workflow syntax on either platform — before writing or editing any workflow YAML on GitHub or Gitea.
 ---
 
 # GitHub / Gitea Actions 工作流编写

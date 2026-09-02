@@ -1,4 +1,4 @@
-# 上下文（Contexts）
+# 上下文（Contexts，GitHub Actions）
 
 > 官方源：https://docs.github.com/en/actions/reference/workflows-and-actions/contexts
 > 本文件为提炼要点，完整属性清单以官方页为准。
