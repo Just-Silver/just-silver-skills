@@ -68,11 +68,13 @@
 
 ## job 容器镜像
 
-- Gitea runner 不注入工具链：裸 `ubuntu:22.04` 无 node/git/curl，JS action（checkout 等）报 `node not found`（127）。**直接用官方镜像**：
+- 用官方镜像（runner 标签映射，workflow 不写 container）：
   ```yaml
-  container: docker.gitea.com/runner-images:ubuntu-22.04
+  # runner config.yaml / .runner 标签
+  labels:
+    - "ubuntu-latest:docker://docker.gitea.com/runner-images:ubuntu-latest"
   ```
-- 官方镜像源：[gitea/runner-images](https://gitea.com/gitea/runner-images)；无法访问时用 Docker Hub 同源 `catthehacker/ubuntu:act-22.04`
+- 覆盖场景（workflow 内）：`container: docker.gitea.com/runner-images:ubuntu-latest`（须带完整前缀；裸 `ubuntu:22.04` 无 node，JS action 报 127）
 
 ## 语法支持随版本演进（默认按当前默认版本 1.27 编写，见"版本策略"）
 
