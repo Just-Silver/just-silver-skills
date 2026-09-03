@@ -93,8 +93,10 @@
 ## Gitea Release 发布（零硬编码，可直接照抄）
 
 > 禁止硬编码 `http://server:3500` / 固定 `owner/repo`（如 `Yin/opencode-gitea`）。实例地址与仓库名必须由上下文动态获取，否则换实例/换仓库即失效。
+> **CHANGELOG 驱动（强制）**：禁止用 `git log PREV_TAG..HEAD` 直拼 Release body 冒充 CHANGELOG（见 `changelog-conventions.md`「糟糕实践」）；`CHANGELOG 是发版的输入`（`ci-cd-practices.md` 标准 CD 全流程 ③），CD 必须从 `CHANGELOG.md` 该版本小节提取。示例仓库需先有 `CHANGELOG.md`（含 `## [Unreleased]`，发版前整理为 `## [x.y.z] - YYYY-MM-DD`）——版本一致性 `tag == CHANGELOG == 包清单版本` 进流水线，不一致即失败（见 `changelog-conventions.md` 一致性卡点）。
 
-- **触发**：`on.push.tags: ['v*']`（打 tag 发版）；`permissions.contents: write` 足够（兼容 Gitea `releases: write`）
+- **触发**：`on.push.tags: ['v*']`（打 tag 发版）；`workflow_dispatch` 触发时跳过一致性校验（人工已 gate）
+- **`permissions.contents: write`** 足够（兼容 Gitea `releases: write`）
 - **动态拼接（1.27 兼容，无函数）**：`github.server_url` + `github.repository` + `github.ref_name`（`github.*` 完全等同 `gitea.*`，且可过 actionlint；`gitea.*` 会报 `undefined variable "gitea"`）
   ```yaml
   permissions:
@@ -105,11 +107,32 @@
       steps:
         - uses: actions/checkout@v4
           with: { fetch-depth: 0, persist-credentials: false }
-        - name: Generate changelog
+        - name: Check version consistency
           run: |
-            PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-            if [ -z "$PREV_TAG" ]; then PREV_TAG=$(git tag --sort=-v:refname | grep -E '^v' | head -n 2 | tail -n 1 || echo ""); fi
-            if [ -z "$PREV_TAG" ] || [ "$PREV_TAG" = "${{ github.ref_name }}" ]; then git log --pretty=format:"- %s (%h) - %an" > /tmp/changelog.txt; else git log "$PREV_TAG..${{ github.ref_name }}" --pretty=format:"- %s (%h) - %an" > /tmp/changelog.txt; fi
+            TAG="${{ github.ref_name }}"
+            case "$TAG" in v*) ;; *) echo "workflow_dispatch，跳过"; exit 0; esac
+            VER="${TAG#v}"
+            PKG_VER=$(node -p "require('./package.json').version")
+            [ "$VER" != "$PKG_VER" ] && echo "ERROR: tag $TAG != package.json $PKG_VER" >&2 && exit 1
+            grep -q "## \[$VER\]" CHANGELOG.md || { echo "ERROR: CHANGELOG.md 缺少 ## [$VER]" >&2; exit 1; }
+        - name: Extract Release Notes from CHANGELOG
+          env:
+            TAG_NAME: ${{ github.ref_name }}
+          run: |
+            VER="${TAG_NAME#v}"
+            VER="$VER" node -e "
+              const fs=require('fs'); const ver=process.env.VER;
+              const md=fs.readFileSync('CHANGELOG.md','utf8'); const lines=md.split('\n');
+              let s=-1,e=lines.length;
+              for(let i=0;i<lines.length;i++){
+                if(lines[i].startsWith('## ['+ver+']')) s=i;
+                else if(s!==-1 && /^## \[/.test(lines[i])){e=i;break;}
+              }
+              if(s===-1){console.error('未找到 ## ['+ver+']');process.exit(1)}
+              const section=lines.slice(s,e).join('\n').trim();
+              const body=section+'\n\n---\n\nInstall: \`npx opencode-gitea gitea install\`';
+              fs.writeFileSync('/tmp/changelog.txt', body);
+            "
         - name: Create Gitea Release
           env:
             GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
@@ -119,11 +142,11 @@
           run: |
             [ -z "$GITEA_SERVER_URL" ] && echo "ERROR: server_url 为空" >&2 && exit 1
             [ -z "$GITEA_REPOSITORY" ] && echo "ERROR: repository 为空" >&2 && exit 1
-            BODY=$(node -e "const fs=require('fs');const tag=process.env.TAG_NAME;let log='';try{log=fs.readFileSync('/tmp/changelog.txt','utf8')}catch(e){log='- Release '+tag}const body='## Changelog\n\n'+log+'\n';console.log(JSON.stringify({tag_name:tag,name:tag,body,draft:false,prerelease:false}))")
+            BODY=$(node -e "const fs=require('fs'); const tag=process.env.TAG_NAME; const body=fs.readFileSync('/tmp/changelog.txt','utf8'); console.log(JSON.stringify({tag_name:tag,name:tag,body,draft:false,prerelease:false}))")
             API_URL="$GITEA_SERVER_URL/api/v1/repos/$GITEA_REPOSITORY/releases"
             HTTP_CODE=$(curl -s -o /tmp/resp.json -w "%{http_code}" -X POST -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: application/json" -d "$BODY" "$API_URL" || echo "000")
             cat /tmp/resp.json; echo "HTTP $HTTP_CODE"
-            if [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "200" ]; then echo "Release $TAG_NAME 创建成功"; elif [ "$HTTP_CODE" = "409" ]; then echo "Release 已存在（409），视为成功"; else echo "Release 创建失败 HTTP=$HTTP_CODE" >&2; exit 1; fi
+            [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "409" ] || { echo "Release 失败 HTTP=$HTTP_CODE" >&2; exit 1; }
   ```
 - **API 形态**：`POST {server_url}/api/v1/repos/{owner}/{repo}/releases`，鉴权 `Authorization: token $GITEA_TOKEN`（`GITEA_TOKEN` 须 `env: GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}` 显式注入，不裸注入），payload `{tag_name,name,body,draft,prerelease}`，成功 `201`/`200`，已存在 `409` 幂等视为成功
 - **校验**：`github.server_url/repository/ref_name` 均在 `references/contexts.md` 常用属性表已列；用 `github.*` 可直接过 `actionlint`，无需 `-ignore`

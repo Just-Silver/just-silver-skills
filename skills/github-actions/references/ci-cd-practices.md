@@ -283,6 +283,12 @@ on:
 - **Conventional Commits**：`feat` → MINOR、`fix` → PATCH、`BREAKING CHANGE` / `!` → MAJOR。提交规范是自动生成 CHANGELOG 与自动推导版本的前提。
 - **版本一致性（发版硬性卡点）**：`git tag` 版本 == CHANGELOG 顶部版本 == 包清单版本（`package.json` / `*.csproj` 等），三处必须一致。建议进 CD 流水线做检查步骤，不一致即失败。
 
+### Gitea CD 可照抄模板（CHANGELOG 驱动）
+
+> 对应 `changelog-conventions.md` 一致性卡点；禁止 `git log` 拼 body。
+
+见 `gitea-differences.md` 更新后的 `Gitea Release 发布` 骨架（`Check version consistency` + `Extract Release Notes from CHANGELOG`），直接照抄两步即可；`workflow_dispatch` 触发时跳过校验。
+
 ## 五、双平台速览（本文件方法论在 Gitea 的对应）
 
 | 工程实践 | GitHub | Gitea |
@@ -305,6 +311,7 @@ on:
 - **没有手动发布通道**（只能靠 push 触发部署）→ 生产部署无法控制时机；加 workflow_dispatch
 - **生产部署无保护** → GitHub 用 environment 保护规则；Gitea 用分支保护 + 手动触发
 - **发版不看 CHANGELOG / 版本一致性** → tag、CHANGELOG、包版本三处不一致，产物与记录脱节；发版前整理 Unreleased 并核对一致性（见 changelog-conventions.md）
+- **CD 用 `git log` 拼 Release body 而非 CHANGELOG 该小节** → 违反 `changelog-conventions.md` 糟糕实践；Release 必须引用 CHANGELOG，`git log` 堆砌是噪音
 - **无视 CI 优化** → 流水线 10 分钟+ 且无任何优化动作，每次迭代都在烧时间
 - **把"能跑"当"设计对了"** → 语法正确只是底线；门禁完整、失败能反馈、发布可回退才是目标
 
