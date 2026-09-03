@@ -1,13 +1,13 @@
 ---
 name: github-actions
-description: Use when writing, creating, or modifying GitHub Actions or Gitea Actions workflow files (.github/workflows/*.yml or .gitea/workflows/*.yml), choosing trigger events (push, pull_request, schedule, workflow_dispatch), using expressions/contexts in workflows, or unsure about Actions workflow syntax on either platform — before writing or editing any workflow YAML on GitHub or Gitea.
+description: Use when writing, creating, or modifying GitHub Actions or Gitea Actions workflow files (.github/workflows/*.yml or .gitea/workflows/*.yml), designing CI/CD pipelines (quality gates, slow CI optimization, deployment/environment strategy), dealing with CI failures, choosing trigger events (push, pull_request, schedule, workflow_dispatch), using expressions/contexts, or unsure about Actions workflow syntax on either platform — before writing or editing any workflow YAML on GitHub or Gitea.
 ---
 
 # GitHub / Gitea Actions 工作流编写
 
 ## Overview
 
-编写 GitHub Actions 或 Gitea Actions workflow 时的**权威参考**。两平台语法约 95% 通用（Gitea Actions 官方设计目标即兼容 GitHub Actions）。所有语法、事件、表达式、上下文均**必须**以对应平台官方文档为准，禁止凭记忆臆造。
+编写 GitHub Actions 或 Gitea Actions workflow 时的**权威参考**，涵盖**语法（怎么写才对）**与**工程实践（该设计什么、为什么、CI 失败后怎么办）**两个层面。两平台语法约 95% 通用（Gitea Actions 官方设计目标即兼容 GitHub Actions）。所有语法、事件、表达式、上下文均**必须**以对应平台官方文档为准，禁止凭记忆臆造。
 
 ## 前置步骤（硬性）
 
@@ -21,6 +21,7 @@ description: Use when writing, creating, or modifying GitHub Actions or Gitea Ac
 3. **`references/expressions.md`** — 表达式字面量、运算符、函数、状态检查函数
 4. **`references/contexts.md`** — 上下文（`github` / `secrets` / `needs` / `matrix` / `steps` 等）与可用性限制
 5. **`references/gitea-differences.md`**（仅 Gitea 目标）— 目录 / 事件 / 表达式 / permissions / token / 版本差异清单
+6. **`references/ci-cd-practices.md`**（可选）— 工程实践：质量门禁流水线设计、CI 失败反馈循环、CI 优化、部署与环境策略（GitHub Environments / Gitea 差异）。需要"设计 CI"或"CI 失败不知怎么处理"时读它
 
 按需读取；**GitHub 目标：本地优先**——references 文件已提炼官方要点，优先从中取信息，不要一上来就抓网页；**Gitea 目标：默认信任本地文件**——按 gitea-differences.md"版本策略"写当前默认版本（1.27）语法，不访问官方文档。确实不确定时回查各 references 文件**顶部标注的官方源链接**（权威完整版，与本技能冲突时以官方原文为准），不得凭记忆补全语法。
 
@@ -32,6 +33,10 @@ description: Use when writing, creating, or modifying GitHub Actions or Gitea Ac
 - 编写或修改表达式 `${{ }}`、`if` 条件、matrix 策略
 - 使用上下文（`github.ref` / `gitea.*` / `needs.*` / `secrets.*` 等）但不确定正确写法
 - 设置 `permissions` 最小权限（注意两平台 scope 差异）
+- **设计 CI 流水线**（质量门禁顺序、哪些门禁该有、每 PR 都跑）
+- **CI 失败不知怎么处理** / 想把 CI 失败喂回给 Agent 修复
+- **CI 太慢想优化**（缓存 / 并行 / path 过滤 / matrix 分片）
+- **配置部署与环境策略**（GitHub Environments 保护、手动发布、secrets 分层、Gitea 无 environment 时的替代）
 - 在两个平台间迁移 workflow（`Pull Request` 迁移用 gitea-differences.md 的检查清单）
 
 **不适用**：其他 CI 系统（GitLab CI / Jenkins 等）的流水线语法；纯操作 run 状态（`gh run` 查看）不需要写 workflow 文件。
@@ -45,6 +50,7 @@ description: Use when writing, creating, or modifying GitHub Actions or Gitea Ac
 | `if` / `${{ }}` / 函数 | `references/expressions.md` |
 | `github.*` / `needs.*` / 可用性限制 | `references/contexts.md` |
 | **Gitea 平台差异（目录/表达式/权限/token/版本）** | **`references/gitea-differences.md`** |
+| **质量门禁设计 / CI 失败反馈 / 优化 / 部署环境策略** | **`references/ci-cd-practices.md`** |
 | 语法校验 | `actionlint`（见下） |
 
 ## 校验方法
@@ -82,3 +88,4 @@ cat .gitea/workflows/ci.yml | scripts/actionlint.exe -   # stdin 单文件
 - **fork PR 用 secrets** → fork PR 中除内置 token 外 secrets 不可用
 - **`if` 里字符串 vs 布尔** → `${{ }}` 求值为字符串时注意类型；数字/布尔比较用 `fromJSON()`
 - **contexts 用错位置** → 某些上下文在特定键不可用（如 `secrets` 不能用于 `if`），见 contexts.md 可用性表
+- **只求语法对、不顾工程实践** → 语法正确只是底线；门禁不完整、CI 失败靠 rerun 掩盖、生产 secrets 进 CI、生产部署无保护才是更大的坑——见 ci-cd-practices.md「Common Mistakes（工程视角）」
