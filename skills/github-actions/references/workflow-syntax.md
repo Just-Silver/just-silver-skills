@@ -107,11 +107,11 @@
 | `actions/setup-python` | 配置 Python 环境 | `@v7` | `python-version` |
 | `actions/setup-go` | 配置 Go 环境 | `@v7` | `go-version` |
 | `actions/upload-artifact` | 上传工件 | `@v7` | `name`、`path` |
-| `actions/download-artifact` | 下载工件 | `@v7` | `name`、`path` |
+| `actions/download-artifact` | 下载工件 | `@v8` | `name`、`path` |
 | `actions/cache` | 依赖缓存 | `@v6` | `path`、`key`（常配 `hashFiles()`） |
 | `softprops/action-gh-release` | 创建 GitHub Release | `@v3` | `tag_name`、`name`、`body_path` |
 
-> **升级 action 到新 major 时**：先确认最新版本与 release notes——`gh api repos/<owner>/<repo>/releases/latest --jq .tag_name`，并核对参数无破坏性变更。
+> **版本核对（2026-09 经 GitHub API 实测）**：以上"常用版本"即各 action 的**当前最新 major**。写新 workflow 前建议用 `gh api repos/<owner>/<repo>/releases/latest --jq .tag_name` 复核（major 可能已升级），并看 release notes 确认参数无破坏性变更。个别 action 最新 major 与文档不符时以实测为准并更新本表。
 
 ### 写 job output 的标准方式
 

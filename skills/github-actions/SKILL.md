@@ -13,14 +13,14 @@ description: Use when writing, creating, or modifying GitHub Actions or Gitea Ac
 
 **0. 第一步：确认目标平台** —— GitHub 还是 Gitea？
 
-- **GitHub** → 读下方 1-4 号 GitHub references
+- **GitHub** → 读下方 1-4 号 GitHub references；若同时涉及 **Gitea 侧**（迁移、审 Gitea workflow、或想确认某 GitHub 写法在 Gitea 是否成立）→ 也读 5 号
 - **Gitea** → 读下方 1-4 号 GitHub references（共同语法）+ **`references/gitea-differences.md`（必读）**。语法策略见该文件"版本策略"小节：**默认按"当前默认版本"（1.27）编写，无需访问官方文档**；用户要求高版本特性（如 1.28 表达式函数）时向用户确认版本，按本地版本演进表编写
 
 1. **`references/workflow-syntax.md`** — 顶层键、`on`、`jobs`、`steps`、`permissions`、matrix、job outputs 完整语法
 2. **`references/events.md`** — 触发事件选型、安全注意（`pull_request_target` 风险）、fork PR 限制
 3. **`references/expressions.md`** — 表达式字面量、运算符、函数、状态检查函数
 4. **`references/contexts.md`** — 上下文（`github` / `secrets` / `needs` / `matrix` / `steps` 等）与可用性限制
-5. **`references/gitea-differences.md`**（仅 Gitea 目标）— 目录 / 事件 / 表达式 / permissions / token / 版本差异清单
+5. **`references/gitea-differences.md`**（Gitea 目标**必读**；GitHub 目标在涉及双平台/迁移时读）— 目录 / 事件 / 表达式 / permissions / token / 版本差异清单，含"从 GitHub 迁移到 Gitea"检查清单
 6. **`references/ci-cd-practices.md`**（可选）— 工程实践：质量门禁流水线设计、CI 失败反馈循环、CI 优化、部署与环境策略（GitHub Environments / Gitea 差异）。需要"设计 CI"或"CI 失败不知怎么处理"时读它
 
 按需读取；**GitHub 目标：本地优先**——references 文件已提炼官方要点，优先从中取信息，不要一上来就抓网页；**Gitea 目标：默认信任本地文件**——按 gitea-differences.md"版本策略"写当前默认版本（1.27）语法，不访问官方文档。确实不确定时回查各 references 文件**顶部标注的官方源链接**（权威完整版，与本技能冲突时以官方原文为准），不得凭记忆补全语法。
@@ -55,16 +55,25 @@ description: Use when writing, creating, or modifying GitHub Actions or Gitea Ac
 
 ## 校验方法
 
-写完后用 `actionlint` 校验语法。**本技能内置校验器**：`scripts/actionlint.exe`（Windows amd64，v1.7.12，官方 release 二进制，已实测）。支持**任意文件数量**——单文件、多文件、glob、stdin 均可：
+写完后用 `actionlint` 校验语法。**本技能内置校验器**：`scripts/actionlint.exe`（Windows amd64，v1.7.12，官方 release 二进制，已实测）。支持**任意文件数量**——单文件、多文件、stdin 均可：
 
 ```bash
 # 内置校验器（相对技能目录；Windows 平台）
 scripts/actionlint.exe .github/workflows/ci.yml          # 单文件
-scripts/actionlint.exe .github/workflows/*.yml           # glob
+scripts/actionlint.exe .github/workflows/ci.yml .gitea/workflows/ci.yaml   # 多文件（逐个列出）
 scripts/actionlint.exe .gitea/workflows/ci.yaml          # Gitea（.gitea/ 不会被自动发现，必须显式路径）
 scripts/actionlint.exe                                   # 无参数：自动发现 .github/workflows/
 cat .gitea/workflows/ci.yml | scripts/actionlint.exe -   # stdin 单文件
 ```
+
+> **Windows/pwsh 注意（实测）**：`*.yml` 通配符**不会**被 pwsh 展开传给原生程序，actionlint 会当字面文件名报 `could not read`（退出码 3）。**Windows 上不要用 glob**——要么逐个列出文件，要么用 pwsh 展开后传入：
+> ```powershell
+> # pwsh 展开 glob 后再传（等效于多文件）
+> & scripts/actionlint.exe -shellcheck= -pyflakes= (Get-ChildItem .github/workflows/*.yml).FullName
+> # 或逐个列出
+> & scripts/actionlint.exe -shellcheck= -pyflakes= .github/workflows/ci.yml .github/workflows/deploy.yml
+> ```
+> Linux/macOS 的 bash 会由 shell 自动展开 glob，`*.yml` 写法可用。
 
 常用选项：
 

@@ -63,6 +63,7 @@
     env:
       GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
   ```
+- **`GITEA_TOKEN` 是内置 token、开箱即用**（官方 token-permissions 文档确认：每个 job 自动获得，`${{ secrets.GITEA_TOKEN }}` 直接可用）——**无需**在仓库 UI 手动配置同名 secret（若手动配了同名 secret 会**覆盖**内置 token）。它的权限由 `permissions`（workflow/job 级）+ 仓库/组织 `Settings → Actions → General` 的默认/最大权限设置共同决定
 - **CI 内回推产物**（自动更新类 workflow）标准写法：`git add` 限定产物目录（如 `docs/`）→ `git diff --cached --quiet` 判空则跳过提交（幂等）→ commit → 用内置 token 的 URL 显式 push。schedule / workflow_dispatch 触发时 checkout 处于 detached HEAD，必须 `git push ... HEAD:main` 显式指定分支
 - `permissions.contents: write` 足够支持回推（对应 Gitea 的 `code: write`）；实际生效权限还受仓库/组织的 MaxTokenPermissions 设置钳制
 
@@ -102,20 +103,22 @@
 
 ## actionlint 校验（GitHub 与 Gitea 均可用）
 
-actionlint 可校验 Gitea workflow（自身无 Gitea 模式，按 GitHub 语法近似校验），支持单文件 / 多文件 / glob / stdin（`-`）任一形态：
+actionlint 可校验 Gitea workflow（自身无 Gitea 模式，按 GitHub 语法近似校验），支持单文件 / 多文件 / stdin（`-`）任一形态：
 
 ```bash
 # 单文件
 actionlint .gitea/workflows/ci.yaml
 # Gitea 全部工作流（显式传路径，默认只扫 .github/workflows/）
-actionlint .gitea/workflows/*.yml
+actionlint .gitea/workflows/ci.yaml .gitea/workflows/release.yaml   # 逐个列出
 
 # 已知误报处理：
 # 1) ${{ gitea.* }} → undefined variable "gitea"：改用 github.*（官方确认功能等同）直接通过，
 #    或 -ignore 'undefined variable "gitea"'
 # 2) runner 过旧类误报：
-actionlint -ignore='the runner of "actions/upload-artifact@v3(\.[0-9]+\.[0-9]+)?" action is too old to run on GitHub Actions' .gitea/workflows/*.yml
+actionlint -ignore='the runner of "actions/upload-artifact@v3(\.[0-9]+\.[0-9]+)?" action is too old to run on GitHub Actions' .gitea/workflows/ci.yaml .gitea/workflows/release.yaml
 ```
+
+> **Windows/pwsh 注意（实测）**：通配符 `*.yml` 不会被 pwsh 展开（见 SKILL.md「校验方法」），**逐个列出文件**或先用 `Get-ChildItem ... *.yml` 展开再传。Linux/macOS bash 下 shell 会自动展开 glob。
 
 - actionlint 版本升级可能引入新规则导致误报，CI 中建议固定版本
 - 绝对 URL 的 `uses: https://...` 不会被纯语法检查报错（仅 `actions` 附加规则在执行时检查）

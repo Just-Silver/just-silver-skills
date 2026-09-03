@@ -65,16 +65,15 @@
 | 顶层 `env` | `github`, `secrets`, `inputs`, `vars` |
 | `jobs.<id>.if` | `github`, `needs`, `vars`, `inputs` |
 | `jobs.<id>.steps.if` | `github`, `needs`, `strategy`, `matrix`, `job`, `runner`, `env`, `vars`, `steps`, `inputs`（**无 `secrets`**） |
-| `jobs.<id>.steps.env` | 同上（**无 `secrets`**） |
+| `jobs.<id>.steps.env` | `github`, `needs`, `strategy`, `matrix`, `job`, `runner`, `env`, `vars`, `steps`, `inputs`, `secrets` |
 | `jobs.<id>.steps.run` | 同上（有 `secrets`） |
 | `jobs.<id>.steps.with` | 同上（有 `secrets`） |
 | `jobs.<id>.outputs.<name>` | `github`, `needs`, `strategy`, `matrix`, `job`, `runner`, `env`, `vars`, `secrets`, `steps`, `inputs` |
 | `jobs.<id>.runs-on` | `github`, `needs`, `strategy`, `matrix`, `vars`, `inputs` |
 
 - `secrets` 可用性限制：
-  - **不能**用于 `if` 条件（`jobs.<id>.if` 无 `secrets`）
-  - **不能**用于 step 级 `env`（`jobs.<id>.steps.env` 无 `secrets`）
-  - **可以**用于顶层 `env`、job 级 `env`、`with`、`run` 命令内
+  - **不能**用于 `if` 条件（`jobs.<id>.if` 与 step 级 `if` 均无 `secrets`）
+  - **可以**用于顶层 `env`、job 级 `env`、**step 级 `env`**、`with`、`run` 命令内（官方可用性表：`steps.env` 含 `secrets`）
 - `hashFiles` 仅在 `steps.*` 的某些键可用
 
 ## 变量 vs 上下文
