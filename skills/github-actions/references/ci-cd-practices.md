@@ -3,6 +3,7 @@
 > 官方源（GitHub）：https://docs.github.com/en/actions （about / using-workflows / deployment 分区）
 > 官方源（Gitea）：https://docs.gitea.com/usage/actions/
 > **定位**：本文件与同目录语法文件互补——语法文件（workflow-syntax / events / expressions / contexts / gitea-differences）回答"**怎么写才正确**"，本文件回答"**该设计什么、为什么、CI 失败后怎么办**"。两者配合：先用本文件想清楚流水线形状，再用语法文件精确落实每个键。
+> **配套文件**：发版时的版本决策 / CHANGELOG / 提交约定见 **`changelog-conventions.md`**（本文件的"CHANGELOG 规范与版本治理"小节给出速览并指向它）。
 > **方法**：先读同目录语法文件掌握正确写法；本节示例均按语法文件与 actionlint 校验过的写法编写，可直接照抄骨架。
 
 ## 一、质量门禁流水线（Shift-Left）
@@ -152,6 +153,49 @@ on:
 
 ## 四、部署与环境策略
 
+### 标准 CD 流水线总览（CI 与 CD 的分界在此）
+
+**术语澄清**：CI 与 CD 都覆盖"自动检查+构建"部分，分界在**谁触发、何时发**。
+
+| | 持续集成 CI | 持续交付 CD | 持续部署 CD |
+|---|---|---|---|
+| 回答的问题 | 代码**能不能合**？ | 产物**能不能随时发**？ | 要不要**每次自动发**？ |
+| 覆盖 | merge 之前：每次 push/PR 自动 lint→type→test→build | merge 之后：构建产物、版本化、发布制品、部署环境 | 在交付之上，**发布动作也自动化** |
+| 发布时机 | 不发布 | **手动**触发（生产前有 gate） | 全自动 |
+| 典型事件 | `push` / `pull_request` | `workflow_dispatch` / `push tags: ['v*']` | 同左，但不等人 |
+
+> **"持续交付"和"持续部署"缩写都是 CD**，差别只在生产部署是人工 gate 还是自动推。口语"CD"多指 Continuous Delivery。
+
+**标准 CD 全流程**（把 CHANGELOG 放回它应有的位置）：
+
+```
+CI 全绿（lint/type/test/build/audit）
+   │
+   ▼
+① 冻结发布内容    合并到 main / release 分支，所有 PR 合入
+   │
+   ▼
+② 版本决策        v1.2.3：按 Conventional Commits 推导 或 手动定（semver）
+   │
+   ▼
+③ 更新 CHANGELOG  ★ 发版的输入：Unreleased → [x.y.z] - 日期，见 changelog-conventions.md
+   │
+   ▼
+④ 一致性校验      tag 版本 == CHANGELOG 版本 == 包清单版本
+   │
+   ▼
+⑤ 打 tag + 发版    git tag v1.2.3；构建产物 + 校验和；发布制品库 / GitHub Releases
+   │
+   ▼
+⑥ 部署 staging     自动，跑冒烟验证
+   │
+   ▼
+⑦ 部署 production  Continuous Delivery：人工 gate（environment required reviewers）
+   │                Continuous Deployment：自动推
+   ▼
+⑧ 可回退          发布记录即版本记录；出问题 rollback 到上一 tag
+```
+
 ### 环境分层与 Secrets 分层
 
 ```
@@ -230,6 +274,15 @@ on:
 > **注意**：tag 触发时 checkout 处于 detached HEAD；若需回推必须 `git push origin HEAD:main`（详见 workflow-syntax.md 陷阱节）。
 > **Gitea 等价**：同样用 `push.tags` 或 `workflow_dispatch`；无 environment 门禁，用仓库分支保护 + 手动触发兜底。
 
+### CHANGELOG 规范与版本治理（发版前必读）
+
+**速览**；完整规范见 **`references/changelog-conventions.md`**（Keep a Changelog 格式 + Conventional Commits + SemVer + 与流水线集成）。
+
+- **CHANGELOG 是发版的输入，不是输出**：`## [Unreleased]` 区块随开发持续累积，发版时把它整理成 `## [x.y.z] - 日期` 小节。CHANGELOG 驱动发布内容，而非发布后才补。
+- **Keep a Changelog**：`Added` / `Changed` / `Deprecated` / `Removed` / `Fixed` / `Security` 六类分组；**至少**列出 deprecations / removals / breaking changes；日期用 ISO `YYYY-MM-DD`；绝不用 git 日志堆砌。
+- **Conventional Commits**：`feat` → MINOR、`fix` → PATCH、`BREAKING CHANGE` / `!` → MAJOR。提交规范是自动生成 CHANGELOG 与自动推导版本的前提。
+- **版本一致性（发版硬性卡点）**：`git tag` 版本 == CHANGELOG 顶部版本 == 包清单版本（`package.json` / `*.csproj` 等），三处必须一致。建议进 CD 流水线做检查步骤，不一致即失败。
+
 ## 五、双平台速览（本文件方法论在 Gitea 的对应）
 
 | 工程实践 | GitHub | Gitea |
@@ -251,6 +304,7 @@ on:
 - **生产 secrets 进 CI / 写进仓库** → CI 与生产 secret 必须分层
 - **没有手动发布通道**（只能靠 push 触发部署）→ 生产部署无法控制时机；加 workflow_dispatch
 - **生产部署无保护** → GitHub 用 environment 保护规则；Gitea 用分支保护 + 手动触发
+- **发版不看 CHANGELOG / 版本一致性** → tag、CHANGELOG、包版本三处不一致，产物与记录脱节；发版前整理 Unreleased 并核对一致性（见 changelog-conventions.md）
 - **无视 CI 优化** → 流水线 10 分钟+ 且无任何优化动作，每次迭代都在烧时间
 - **把"能跑"当"设计对了"** → 语法正确只是底线；门禁完整、失败能反馈、发布可回退才是目标
 
@@ -262,6 +316,7 @@ on:
 - 生产 secrets 出现在 workflow 文件或普通仓库变量里
 - 任何 push 都会触发生产部署、无法手动控制
 - 测试 flaky 时第一反应是 rerun 而不是排查
+- 打 tag 发版但 CHANGELOG 没有对应版本条目 / 版本号与 tag 对不上
 
 **以上任一出现 → 回到本文件对应章节修正后再谈合并。**
 
@@ -272,5 +327,6 @@ on:
 - [ ] 最小 `permissions`；secrets 分层（CI 无生产凭据）
 - [ ] CI 失败会有人（人或 Agent）收到并修复，不靠 rerun 掩盖
 - [ ] 生产部署有手动/受控通道 + 保护（environment 或分支保护）
+- [ ] 发版流程含 CHANGELOG：Unreleased → 版本小节；tag/CHANGELOG/包版本三处一致（详见 changelog-conventions.md 落地清单）
 - [ ] 流水线 ~10 分钟内；超时已做缓存 / 并行 / 路径过滤
 - [ ] `actionlint` 校验通过（用法见 SKILL.md「校验方法」）

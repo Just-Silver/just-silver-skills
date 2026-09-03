@@ -1,6 +1,6 @@
 ---
 name: github-actions
-description: Use when writing, creating, or modifying GitHub Actions or Gitea Actions workflow files (.github/workflows/*.yml or .gitea/workflows/*.yml), designing CI/CD pipelines (quality gates, slow CI optimization, deployment/environment strategy), dealing with CI failures, choosing trigger events (push, pull_request, schedule, workflow_dispatch), using expressions/contexts, or unsure about Actions workflow syntax on either platform — before writing or editing any workflow YAML on GitHub or Gitea.
+description: Use when writing, creating, or modifying GitHub Actions or Gitea Actions workflow files (.github/workflows/*.yml or .gitea/workflows/*.yml), designing CI/CD pipelines (quality gates, slow CI optimization, deployment/environment strategy), planning or reviewing version releases and CHANGELOG conventions (Keep a Changelog, Conventional Commits, SemVer, tag-driven publishing), dealing with CI failures, choosing trigger events (push, pull_request, schedule, workflow_dispatch), using expressions/contexts, or unsure about Actions workflow syntax on either platform — before writing or editing any workflow YAML on GitHub or Gitea.
 ---
 
 # GitHub / Gitea Actions 工作流编写
@@ -22,6 +22,7 @@ description: Use when writing, creating, or modifying GitHub Actions or Gitea Ac
 4. **`references/contexts.md`** — 上下文（`github` / `secrets` / `needs` / `matrix` / `steps` 等）与可用性限制
 5. **`references/gitea-differences.md`**（Gitea 目标**必读**；GitHub 目标在涉及双平台/迁移时读）— 目录 / 事件 / 表达式 / permissions / token / 版本差异清单，含"从 GitHub 迁移到 Gitea"检查清单
 6. **`references/ci-cd-practices.md`**（可选）— 工程实践：质量门禁流水线设计、CI 失败反馈循环、CI 优化、部署与环境策略（GitHub Environments / Gitea 差异）。需要"设计 CI"或"CI 失败不知怎么处理"时读它
+7. **`references/changelog-conventions.md`**（发版/CD 治理时读）— Keep a Changelog 格式、Conventional Commits、SemVer 版本决策、CHANGELOG 与 tag/包版本的一致性、git-cliff / release-please / semantic-release 工具指针。**涉及打 tag 发版、维护 CHANGELOG、定版本号时必读**
 
 按需读取；**GitHub 目标：本地优先**——references 文件已提炼官方要点，优先从中取信息，不要一上来就抓网页；**Gitea 目标：默认信任本地文件**——按 gitea-differences.md"版本策略"写当前默认版本（1.27）语法，不访问官方文档。确实不确定时回查各 references 文件**顶部标注的官方源链接**（权威完整版，与本技能冲突时以官方原文为准），不得凭记忆补全语法。
 
@@ -37,6 +38,7 @@ description: Use when writing, creating, or modifying GitHub Actions or Gitea Ac
 - **CI 失败不知怎么处理** / 想把 CI 失败喂回给 Agent 修复
 - **CI 太慢想优化**（缓存 / 并行 / path 过滤 / matrix 分片）
 - **配置部署与环境策略**（GitHub Environments 保护、手动发布、secrets 分层、Gitea 无 environment 时的替代）
+- **规划版本发布 / 维护 CHANGELOG / 定版本号**（Keep a Changelog 格式、Conventional Commits、SemVer、发版前一致性校验）
 - 在两个平台间迁移 workflow（`Pull Request` 迁移用 gitea-differences.md 的检查清单）
 
 **不适用**：其他 CI 系统（GitLab CI / Jenkins 等）的流水线语法；纯操作 run 状态（`gh run` 查看）不需要写 workflow 文件。
@@ -51,6 +53,7 @@ description: Use when writing, creating, or modifying GitHub Actions or Gitea Ac
 | `github.*` / `needs.*` / 可用性限制 | `references/contexts.md` |
 | **Gitea 平台差异（目录/表达式/权限/token/版本）** | **`references/gitea-differences.md`** |
 | **质量门禁设计 / CI 失败反馈 / 优化 / 部署环境策略** | **`references/ci-cd-practices.md`** |
+| **发版治理：CHANGELOG / 提交约定 / 版本决策 / 一致性** | **`references/changelog-conventions.md`** |
 | 语法校验 | `actionlint`（见下） |
 
 ## 校验方法
@@ -97,4 +100,5 @@ cat .gitea/workflows/ci.yml | scripts/actionlint.exe -   # stdin 单文件
 - **fork PR 用 secrets** → fork PR 中除内置 token 外 secrets 不可用
 - **`if` 里字符串 vs 布尔** → `${{ }}` 求值为字符串时注意类型；数字/布尔比较用 `fromJSON()`
 - **contexts 用错位置** → 某些上下文在特定键不可用（如 `secrets` 不能用于 `if`），见 contexts.md 可用性表
+- **发版（打 tag / 发 Release）不考虑 CHANGELOG 与版本一致性** → 发版治理不是可选项：CHANGELOG 是发版输入，tag / CHANGELOG / 包版本必须三处一致；见 references/changelog-conventions.md
 - **只求语法对、不顾工程实践** → 语法正确只是底线；门禁不完整、CI 失败靠 rerun 掩盖、生产 secrets 进 CI、生产部署无保护才是更大的坑——见 ci-cd-practices.md「Common Mistakes（工程视角）」
