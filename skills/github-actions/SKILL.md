@@ -41,3 +41,4 @@ GitHub Actions 与 Gitea Actions 约 95% 语法通用（后者兼容前者）。
 - Gitea 套用 `environment` / `{group:,labels:}` / 专属 scope / `GITHUB_TOKEN`
 - Gitea 1.27 用函数（仅 `always()`）→ 用事件过滤与 `==` 替代
 - `secrets` 误用于 `if`、`pull_request_target` 滥用、tag 回推忘 `HEAD:main`
+- 硬编码 `http://server:3500` / 固定 `owner/repo` → 用 `${{ github.server_url }}/${{ github.repository }}/${{ github.ref_name }}` 动态拼接（`gitea-differences.md` Release/回推通用模板，push 需去协议头）

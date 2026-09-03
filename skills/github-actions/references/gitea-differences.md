@@ -57,15 +57,76 @@
 
 ## 内置 token 与 CI 回推（实测注意）
 
-- **Gitea 内置 token 不裸注入环境变量**（实测踩坑）：GitHub 的 `GITHUB_TOKEN` 自动出现在 job 环境里；Gitea 的 `GITEA_TOKEN` **只通过 `${{ secrets.GITEA_TOKEN }}` 暴露**——步骤里直接引用裸 `${GITEA_TOKEN}` 得到空值（实测 push 报 `Failed to authenticate user`）。必须显式注入：
+- **Gitea 内置 token 不裸注入环境变量**（实测踩坑）：GitHub 的 `GITHUB_TOKEN` 自动出现在 job 环境里；Gitea 的 `GITEA_TOKEN` **只通过 `${{ secrets.GITEA_TOKEN }}` 暴露**——步骤里直接引用裸 `${GITEA_TOKEN}` 得到空值（实测 push 报 `Failed to authenticate user`）。必须显式注入，且**禁止硬编码** `<实例>/<owner>/<repo>`（如 `http://server:3500` / `gitea.yindexiaowu.top:16666/Yin/repo`），一律用 `github.server_url` + `github.repository` 动态拼接（`server_url` 含 `https://`，`git push` 需去协议头）：
   ```yaml
-  - run: git push "https://oauth2:${GITEA_TOKEN}@<实例>/<owner>/<repo>.git" HEAD:main
+  - run: |
+      HOST="${GITEA_SERVER_URL#https://}"
+      HOST="${HOST#http://}"
+      git push "https://oauth2:${GITEA_TOKEN}@${HOST}/${GITEA_REPOSITORY}.git" HEAD:main
     env:
       GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+      GITEA_SERVER_URL: ${{ github.server_url }}
+      GITEA_REPOSITORY: ${{ github.repository }}
   ```
 - **`GITEA_TOKEN` 是内置 token、开箱即用**（官方 token-permissions 文档确认：每个 job 自动获得，`${{ secrets.GITEA_TOKEN }}` 直接可用）——**无需**在仓库 UI 手动配置同名 secret（若手动配了同名 secret 会**覆盖**内置 token）。它的权限由 `permissions`（workflow/job 级）+ 仓库/组织 `Settings → Actions → General` 的默认/最大权限设置共同决定
-- **CI 内回推产物**（自动更新类 workflow）标准写法：`git add` 限定产物目录（如 `docs/`）→ `git diff --cached --quiet` 判空则跳过提交（幂等）→ commit → 用内置 token 的 URL 显式 push。schedule / workflow_dispatch 触发时 checkout 处于 detached HEAD，必须 `git push ... HEAD:main` 显式指定分支
+- **CI 内回推产物**（自动更新类 workflow，零硬编码通用模板）：`git add` 限定产物目录（如 `docs/`）→ `git diff --cached --quiet` 判空则跳过提交（幂等）→ commit → 用 `server_url`+`repository` 动态推。schedule / workflow_dispatch 触发时 checkout 处于 detached HEAD，必须 `git push ... HEAD:main` 显式指定分支：
+  ```yaml
+  - uses: actions/checkout@v4
+  - run: |
+      # ... 产物生成到 docs/ ...
+      git add docs/
+      git diff --cached --quiet && echo "无变更，跳过" && exit 0
+      git config user.name "gitea-actions"
+      git config user.email "actions@gitea.local"
+      git commit -m "chore: update docs"
+  - run: |
+      HOST="${GITEA_SERVER_URL#https://}"
+      HOST="${HOST#http://}"
+      git push "https://oauth2:${GITEA_TOKEN}@${HOST}/${GITEA_REPOSITORY}.git" HEAD:main
+    env:
+      GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+      GITEA_SERVER_URL: ${{ github.server_url }}
+      GITEA_REPOSITORY: ${{ github.repository }}
+  ```
 - `permissions.contents: write` 足够支持回推（对应 Gitea 的 `code: write`）；实际生效权限还受仓库/组织的 MaxTokenPermissions 设置钳制
+
+## Gitea Release 发布（零硬编码，可直接照抄）
+
+> 禁止硬编码 `http://server:3500` / 固定 `owner/repo`（如 `Yin/opencode-gitea`）。实例地址与仓库名必须由上下文动态获取，否则换实例/换仓库即失效。
+
+- **触发**：`on.push.tags: ['v*']`（打 tag 发版）；`permissions.contents: write` 足够（兼容 Gitea `releases: write`）
+- **动态拼接（1.27 兼容，无函数）**：`github.server_url` + `github.repository` + `github.ref_name`（`github.*` 完全等同 `gitea.*`，且可过 actionlint；`gitea.*` 会报 `undefined variable "gitea"`）
+  ```yaml
+  permissions:
+    contents: write
+  jobs:
+    release:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+          with: { fetch-depth: 0, persist-credentials: false }
+        - name: Generate changelog
+          run: |
+            PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+            if [ -z "$PREV_TAG" ]; then PREV_TAG=$(git tag --sort=-v:refname | grep -E '^v' | head -n 2 | tail -n 1 || echo ""); fi
+            if [ -z "$PREV_TAG" ] || [ "$PREV_TAG" = "${{ github.ref_name }}" ]; then git log --pretty=format:"- %s (%h) - %an" > /tmp/changelog.txt; else git log "$PREV_TAG..${{ github.ref_name }}" --pretty=format:"- %s (%h) - %an" > /tmp/changelog.txt; fi
+        - name: Create Gitea Release
+          env:
+            GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+            GITEA_SERVER_URL: ${{ github.server_url }}
+            GITEA_REPOSITORY: ${{ github.repository }}
+            TAG_NAME: ${{ github.ref_name }}
+          run: |
+            [ -z "$GITEA_SERVER_URL" ] && echo "ERROR: server_url 为空" >&2 && exit 1
+            [ -z "$GITEA_REPOSITORY" ] && echo "ERROR: repository 为空" >&2 && exit 1
+            BODY=$(node -e "const fs=require('fs');const tag=process.env.TAG_NAME;let log='';try{log=fs.readFileSync('/tmp/changelog.txt','utf8')}catch(e){log='- Release '+tag}const body='## Changelog\n\n'+log+'\n';console.log(JSON.stringify({tag_name:tag,name:tag,body,draft:false,prerelease:false}))")
+            API_URL="$GITEA_SERVER_URL/api/v1/repos/$GITEA_REPOSITORY/releases"
+            HTTP_CODE=$(curl -s -o /tmp/resp.json -w "%{http_code}" -X POST -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: application/json" -d "$BODY" "$API_URL" || echo "000")
+            cat /tmp/resp.json; echo "HTTP $HTTP_CODE"
+            if [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "200" ]; then echo "Release $TAG_NAME 创建成功"; elif [ "$HTTP_CODE" = "409" ]; then echo "Release 已存在（409），视为成功"; else echo "Release 创建失败 HTTP=$HTTP_CODE" >&2; exit 1; fi
+  ```
+- **API 形态**：`POST {server_url}/api/v1/repos/{owner}/{repo}/releases`，鉴权 `Authorization: token $GITEA_TOKEN`（`GITEA_TOKEN` 须 `env: GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}` 显式注入，不裸注入），payload `{tag_name,name,body,draft,prerelease}`，成功 `201`/`200`，已存在 `409` 幂等视为成功
+- **校验**：`github.server_url/repository/ref_name` 均在 `references/contexts.md` 常用属性表已列；用 `github.*` 可直接过 `actionlint`，无需 `-ignore`
 
 ## job 容器镜像
 

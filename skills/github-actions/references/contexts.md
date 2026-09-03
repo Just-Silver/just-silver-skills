@@ -34,8 +34,10 @@
 | `github.ref_name` | 短名（分支名或 tag 名，如 `v1.0.0`） |
 | `github.ref_type` | `branch` 或 `tag` |
 | `github.sha` | 触发提交 SHA |
-| `github.repository` | `owner/repo` |
+| `github.repository` | `owner/repo`（Gitea 上等同 `gitea.repository`） |
 | `github.repository_owner` | owner 用户名 |
+| `github.server_url` | 实例根 URL（如 `https://gitea.example.com`，Gitea 上等同 `gitea.server_url`，用于拼接 API 地址，禁止硬编码 `server:3500`） |
+| `github.api_url` | API 根 URL（如 `https://gitea.example.com/api/v1`，Gitea 上等同 `gitea.api_url`） |
 | `github.actor` | 触发用户 |
 | `github.event_name` | 触发事件名（`push` / `pull_request` 等） |
 | `github.event` | 完整 webhook payload |
