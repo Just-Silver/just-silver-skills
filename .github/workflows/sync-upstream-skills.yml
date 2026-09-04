@@ -13,8 +13,10 @@ name: sync-upstream-skills
 #      .mirror 标记自动将其排除出自建技能表，无需改脚本
 #   6. pr_branch 固定分支名（默认 sync/<dst 末段>，如 skills/obra-superpowers → sync/obra-superpowers）；
 #      显式传入更清晰，定时任务有更新时创建或更新该分支的 PR，无更新静默跳过，review 后手动合并
-#   7. 上传 workflow 文件一律 git push（REST API 无 Workflows 权限）
-#   8. 新增/修改后必须立即 gh workflow run sync-<name>.yml 手动冒烟一次，不得等调度窗口
+#   7. 仓库 Settings → Actions → General → Workflow permissions 必须勾选
+#      Allow GitHub Actions to create and approve pull requests，否则 gh pr create 报 not permitted
+#   8. 上传 workflow 文件一律 git push（REST API 无 Workflows 权限）
+#   9. 新增/修改后必须立即 gh workflow run sync-<name>.yml 手动冒烟一次，不得等调度窗口
 #
 # 约定（拉取失败必须抛错，只有无更新才静默）：
 #   - 上游仓库被删/改名、无分支、无源目录 → throw，job 变红，不动本地、不开 PR
@@ -134,7 +136,11 @@ jobs:
             $branch = "sync/$leaf"
           }
           git add $env:DST_DIR
-          if (git diff --cached --quiet) {
+          # 注意：git diff --quiet 靠 exit code 判空（有差异 exit 1，无差异 exit 0），
+          # 不能写成 if (git diff --cached --quiet)——PowerShell 取的是命令 stdout（为空恒为假），
+          # 且 exit 1 在 $ErrorActionPreference='Stop' 下可能直接抛错；改用 --name-only 输出判空。
+          $staged = git diff --cached --name-only
+          if ([string]::IsNullOrWhiteSpace($staged)) {
             Write-Output '上游无更新，跳过 PR'
             exit 0
           }
@@ -144,10 +150,13 @@ jobs:
           git commit -m $env:COMMIT_MESSAGE
           git push -f origin "HEAD:$branch"   # -f：同名分支已有旧同步提交时直接覆盖，保证 PR 永远是“最新 main + 最新上游”
           # 同名 PR 已存在则只推分支（PR 自动更新），不存在才新建
-          $existing = gh pr list --head $branch --base main --json url --jq '.[0].url' 2>$null
+          # 注意：gh pr list 无匹配时返回 []，'.[0].url' 会输出字面量 null，必须加 '// empty' 转为空输出，
+          # 否则 $existing 拿到 "null" 字符串误判为 PR 已存在，导致该建 PR 时没建
+          $existing = gh pr list --head $branch --base main --json url --jq '.[0].url // empty' 2>$null
           if ([string]::IsNullOrWhiteSpace($existing)) {
             $body = "上游仓库: $env:UPSTREAM_REPO`n上游分支: $env:UPSTREAM_BRANCH`n源目录: $env:SRC_DIR`n目标目录: $env:DST_DIR`n`n由 sync workflow 自动生成，review 后手动合并。"
             gh pr create --base main --head $branch --title $env:COMMIT_MESSAGE --body $body
+            if ($LASTEXITCODE -ne 0) { throw "PR 创建失败（若提示 not permitted to create pull requests，请去仓库 Settings → Actions → General 勾选 Allow GitHub Actions to create and approve pull requests）" }
             Write-Output '已创建 PR'
           } else {
             Write-Output "已更新已有 PR: $existing"
