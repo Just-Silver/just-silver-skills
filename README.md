@@ -15,6 +15,7 @@
 | doubt-driven-development | Use when stakes are high (production, security, irreversible), when working in unfamiliar code, when correc... | [skills/sdlc/doubt-driven-development/](skills/sdlc/doubt-driven-development/) |
 | github-actions | Use when creating or editing GitHub Actions or Gitea Actions workflow YAML (.github/workflows/*.yml, .gitea... | [skills/github-actions/](skills/github-actions/) |
 | incremental-implementation | Use when implementing any feature or change that touches more than one file, when about to write a large am... | [skills/sdlc/incremental-implementation/](skills/sdlc/incremental-implementation/) |
+| karpathy-guidelines | Behavioral guidelines to reduce common LLM coding mistakes. Use when writing, reviewing, or refactoring cod... | [skills/karpathy-guidelines/](skills/karpathy-guidelines/) |
 | observability-and-instrumentation | Use when adding logging, metrics, tracing, or alerting, when shipping a feature that runs in production, or... | [skills/sdlc/observability-and-instrumentation/](skills/sdlc/observability-and-instrumentation/) |
 | security-and-hardening | Use when handling user input, secrets, tokens, or file paths, when building auth or external integrations, ... | [skills/sdlc/security-and-hardening/](skills/sdlc/security-and-hardening/) |
 | shipping-and-launch | Use when shipping a versioned release with git tag, CHANGELOG, and Release, before pushing tag or publishin... | [skills/sdlc/shipping-and-launch/](skills/sdlc/shipping-and-launch/) |

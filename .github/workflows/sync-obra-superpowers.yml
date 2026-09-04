@@ -13,40 +13,10 @@ concurrency:
 
 jobs:
   sync:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v5
-      - name: 全量镜像上游 skills 到 skills/obra-superpowers
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('superpowers-' + [guid]::NewGuid().ToString('N'))
-          try {
-            git clone --depth 1 --branch main https://github.com/obra/superpowers.git $tmp
-            $src = Join-Path $tmp 'skills'
-            if (-not (Test-Path $src)) { throw '上游仓库缺少 skills 目录，终止同步' }
-            $dst = Join-Path $PWD 'skills/obra-superpowers'
-            if (Test-Path $dst) { Remove-Item $dst -Recurse -Force }  # 完全镜像：上游删了本地跟着删
-            New-Item -ItemType Directory -Path $dst | Out-Null
-            Copy-Item (Join-Path $src '*') $dst -Recurse -Force
-            Write-Output '镜像完成'
-          } finally {
-            Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
-          }
-      - name: 有变更则自动提交
-        shell: pwsh
-        run: |
-          # 防循环：只提交 skills/obra-superpowers/ 下的镜像文件，不触碰 .github/workflows/**；
-          # 该目录在 scripts/update-readme.ps1 的排除名单内，不计入自建技能表 →
-          # 提交会触发 update-readme（paths: skills/**），而后者只提交 README.md → 递归终止。
-          git add skills/obra-superpowers
-          if (git diff --cached --quiet) {
-            Write-Output '上游无更新，跳过提交'
-          } else {
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git commit -m 'chore: 同步上游 obra/superpowers skills 镜像'
-            git pull --rebase               # 同组排队只保证不同时跑，不保证 base 最新；推前 rebase 避免 non-fast-forward
-            git push
-            Write-Output '已自动提交并推送'
-          }
+    uses: ./.github/workflows/sync-upstream-skills.yml
+    with:
+      upstream_repo: https://github.com/obra/superpowers.git
+      upstream_branch: main
+      src_dir: skills
+      dst_dir: skills/obra-superpowers
+      commit_message: 'chore: 同步上游 obra/superpowers skills 镜像'

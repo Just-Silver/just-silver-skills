@@ -19,8 +19,8 @@ function Add-SkillRow([string]$skPath, [string]$relDir) {
     $script:rows += "| $name | $desc | [skills/$relDir/](skills/$relDir/) |"
 }
 $rows = @()
-$exclude = @('obra-superpowers')  # 上游镜像目录（sync-obra-superpowers.yml 维护），不计入自建技能表
-Get-ChildItem $skillsDir -Directory | Where-Object { $exclude -notcontains $_.Name } | Sort-Object Name | ForEach-Object {
+# 镜像目录（由 sync-upstream-skills.yml 维护，内含 .mirror 标记）不计入自建技能表
+Get-ChildItem $skillsDir -Directory | Where-Object { -not (Test-Path (Join-Path $_.FullName '.mirror')) } | Sort-Object Name | ForEach-Object {
     $skPath = Join-Path $_.FullName 'SKILL.md'
     if (Test-Path $skPath) {
         # 顶层技能：skills/<name>/SKILL.md

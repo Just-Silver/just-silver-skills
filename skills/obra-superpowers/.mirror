@@ -1,0 +1,1 @@
+upstream=https://github.com/obra/superpowers.git branch=main src=skills

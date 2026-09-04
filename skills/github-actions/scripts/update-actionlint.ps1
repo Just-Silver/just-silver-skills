@@ -5,13 +5,13 @@
 #   ./scripts/update-actionlint.ps1 -Force          # 版本相同也强制重新下载验证
 #   ./scripts/update-actionlint.ps1 -Platform linux_amd64   # 显式指定平台资产
 #
-# 退出码：0 = 已是最新、更新成功或上游查询失败时跳过（保持现有二进制可用）；1 = 下载/校验等真实失败
+# 退出码：0 = 已是最新或更新成功；1 = 上游查询/下载/校验失败（拉取失败即抛错，只有无更新才静默跳过）
 #
 # 设计要点：
 #   - 版本事实源：同目录 actionlint.version（脚本与 CI 都读它）
 #   - 幂等：版本相同（且未 -Force）时不重新下载
 #   - 原子替换：先下载到临时目录并跑 --version 验证，验证通过才覆盖技能目录
-#   - 失败降级：网络/API 出错时输出警告并退出 0（跳过更新，不触碰现有二进制，避免偶发网络抖动染红 CI）
+#   - 失败即抛错：网络/API 出错时输出错误并退出 1（拉取失败必须染红，只有无更新才静默跳过）
 #   - 本机平台自动映射（AMD64/ARM64 常见组合）；CI 固定传 -Platform windows_amd64
 #     （因为仓库内置的是 Windows amd64 二进制，与 runner 平台无关）
 
@@ -69,8 +69,8 @@ if (-not $release) {
   try { $release = Invoke-RestMethod -Uri $ApiUrl -Headers @{ 'User-Agent' = 'just-silver-skills' } } catch { $release = $null }
 }
 if (-not $release) {
-  Write-Warning '查询上游最新版失败（gh 与匿名 API 均不可用，可能限流或网络不通）；用现有校验器继续'
-  exit 0
+  Write-Error '查询上游最新版失败（gh 与匿名 API 均不可用，可能限流、网络不通或仓库被删/改名）；拉取失败必须抛错'
+  exit 1
 }
 $latestTag = $release.tag_name
 Write-Output "上游最新: $latestTag"
