@@ -28,7 +28,7 @@
 ## 各 workflow 职责
 
 - `update-readme.yml`：push 到 main 且匹配 `paths: ['skills/**']`（或手动）→ 跑脚本 → 只提交 `README.md`
-- `update-actionlint.yml`：每周一 03:00 UTC + 手动兜底（**push 不触发**）→ 轮询 rhysd/actionlint → 有新版提交 `actionlint.exe` + `actionlint.version`；**只有无更新才静默，拉取失败必须抛错染红**
+- `update-actionlint.yml`：每周一 03:00 UTC + 手动兜底（**push 不触发**）→ 跑 `update-actionlint.ps1` 轮询 rhysd/actionlint → **A2 绿灯**（新校验器对仓库 workflow 零新增报错）才自动提交 `actionlint.exe` + `actionlint.version` 到 main；**A2 红灯**（新版引入新增报错）截停改开 PR（分支 `update-actionlint/upgrade`）供人工 review；**A1 自愈**（本地 exe 缺失强制重下）；**只有无更新才静默，拉取失败必须抛错染红**（exit 1）
 - 路径坑：actionlint 脚本在**技能目录** `skills/github-actions/scripts/update-actionlint.ps1`，**不在仓库根 `scripts/`**（后者与技能目录无关）——两个 workflow 的调用路径不同，别搞混（曾因此踩坑）
 - 一键安装/卸载：脚本在 `scripts/install-skills.sh` / `scripts/uninstall-skills.sh`，命令见 README 顶部；安装远程拉 main.tar.gz → 原子替换全局 `skills/just-silver-skills/`，幂等可重跑。两脚本内置 MSYS 路径修正（PowerShell 里 `curl | bash` 时 bash 继承 Windows PATH，需前置 `/usr/bin` 并把 `$DEST` 经 cygpath 转 Unix 路径，否则 `find`/glob 会踩 Windows 工具）——**改这两个脚本必须在 PowerShell 宿主用 `curl ... | bash` 真实验证**（参考脚本内注释）
 - `sync-obra-superpowers.yml`：thin caller，只填 6 个 inputs；同步逻辑在可复用模板 `sync-upstream-skills.yml`（`workflow_call`，不独立运行）；模板推固定分支（`sync/<name>`）开 PR，review 后手动合并；前置要求仓库 Settings → Actions → General 勾选 Allow GitHub Actions to create and approve pull requests

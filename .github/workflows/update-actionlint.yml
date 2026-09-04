@@ -5,7 +5,8 @@ on:
   workflow_dispatch:            # 手动触发兜底
 
 permissions:
-  contents: write               # 自动提交更新后的校验器
+  contents: write               # 绿灯自动提交 / 红灯推固定分支 用
+  pull-requests: write          # 红灯时开 PR 供人工 review
 
 concurrency:
   group: auto-commit-main
@@ -16,10 +17,50 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
+
+      # 运行更新脚本，把结果写入 step outputs，不让非零退出码中断 job（红灯 exit 2 是"预期分支"，不是异常）
       - name: 检查并更新内置校验器（固定更新 Windows amd64 资产，与 runner 平台无关）
+        id: updater
         shell: pwsh
-        run: ./skills/github-actions/scripts/update-actionlint.ps1 -Platform windows_amd64
-      - name: 有更新则自动提交
+        run: |
+          ./skills/github-actions/scripts/update-actionlint.ps1 -Platform windows_amd64
+          $code = $LASTEXITCODE
+          Write-Output "updater_exit=$code"
+          Write-Output "updater_exit=$code" >> $env:GITHUB_OUTPUT
+
+      # 红灯：脚本 exit 2 = A2 质量门禁检出新版引入新增报错 → 提交固定分支 + 开 PR，不推 main
+      - name: 红灯 - 新版引入新增报错，开 PR 供人工 review
+        if: steps.updater.outputs.updater_exit == '2'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # 只提交校验器与版本文件；不触碰 .github/workflows/**（防循环）
+          git add skills/github-actions/scripts/actionlint.exe skills/github-actions/scripts/actionlint.version
+          $staged = git diff --cached --name-only
+          if ([string]::IsNullOrWhiteSpace($staged)) {
+            Write-Output '红灯但无待提交变更（可能本地已是最新/异常），跳过 PR'
+            exit 0
+          }
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          $branch = 'update-actionlint/upgrade'
+          git checkout -B $branch
+          git commit -m 'chore: 升级内置 actionlint 校验器（A2 红灯，待 review）'
+          git push -f origin "HEAD:$branch"
+          $body = "A2 质量门禁检出：新版 actionlint 对仓库现有 workflow 引入新增报错，自动升级被截停。" + "`n`n" + "请 review 后决定：忽略（新版误报/可接受，直接合并本 PR 升级）或 修复（先在 main 修复新增报错再合）。" + "`n" + "未落地前仓库仍使用旧版校验器，不受影响。" + "`n`n" + "- 本 PR 由 update-actionlint workflow 自动生成" + "`n" + "- 新增报错明细见 workflow 日志（A2 红灯段）"
+          $existing = gh pr list --head $branch --base main --json url --jq '.[0].url // empty' 2>$null
+          if ([string]::IsNullOrWhiteSpace($existing)) {
+            gh pr create --base main --head $branch --title 'chore: 升级内置 actionlint 校验器（A2 红灯，待 review）' --body $body
+            if ($LASTEXITCODE -ne 0) { throw "PR 创建失败（若提示 not permitted，请到 Settings → Actions → General 勾选 Allow GitHub Actions to create and approve pull requests）" }
+            Write-Output '已创建红灯 PR'
+          } else {
+            Write-Output "已更新已有红灯 PR: $existing"
+          }
+
+      # 绿灯/已最新：exit 0 且有变更 → 自动提交到 main；exit 1（异常）在上一步已染红，不会走到这里
+      - name: 绿灯 - 自动提交到 main
+        if: steps.updater.outputs.updater_exit == '0'
         shell: pwsh
         run: |
           # 防循环：只提交 skills/github-actions/scripts/ 下的校验器与版本文件，
