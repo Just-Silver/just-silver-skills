@@ -46,6 +46,7 @@ jobs:
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
             git commit -m 'chore: 同步上游 obra/superpowers skills 镜像'
+            git pull --rebase               # 同组排队只保证不同时跑，不保证 base 最新；推前 rebase 避免 non-fast-forward
             git push
             Write-Output '已自动提交并推送'
           }

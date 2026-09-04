@@ -93,7 +93,7 @@ concurrency:
   cancel-in-progress: false   # 默认值，可省略；组内排队，一次只跑一个
 ```
 
-- **同名是关键**：组名按 `group` 字符串跨 workflow 互斥。各 workflow 若 group 名不同（如各用各的 `ci-...`），等于没排队，照样冲突。
+- **同名是关键**：组名按 `group` 字符串跨 workflow 互斥。各 workflow 若 group 名不同（如各用各的 `ci-...`），等于没排队，照样冲突。组名可用固定名（如只回推 main 的 `auto-commit-main`）或按分支隔离（如 `pushback-${{ github.ref }}`），选一种后所有回推 workflow 保持一致。
 - 回推步骤本身仍要 `git pull --rebase` 后再 `git push`（排队只保证不同时跑，不保证 base 最新）。
 - CI 纯检查类 workflow 继续用 `cancel-in-progress: true` 省 runner；只有**带写回**（push / Release / 镜像同步提交）的 workflow 进 `pushback-` 组。
 
