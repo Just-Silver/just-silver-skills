@@ -6,6 +6,14 @@ curl -fsSL https://raw.githubusercontent.com/Just-Silver/just-silver-skills/main
 
 Windows 请在 Git Bash（或任意带 bash 的命令窗）中执行；无需先克隆仓库，自动拉取最新版并原子替换全局 `skills/just-silver-skills/`，不动他人技能，幂等可重跑。
 
+## 一键卸载
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Just-Silver/just-silver-skills/main/scripts/uninstall-skills.sh | bash
+```
+
+删除全局 `skills/just-silver-skills/`，并顺带清理安装/更新异常中断可能残留的临时目录。
+
 <!-- AUTO-GENERATED: 技能表格由 scripts\update-readme.ps1 生成，请勿手改 -->
 
 | 技能 | 介绍 | 跳转位置 |
