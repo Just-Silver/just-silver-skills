@@ -18,7 +18,7 @@
 
 ## CI 通用铁律（三个 workflow 共用，改前先读本节）
 
-- 并发：共用 `concurrency.group: auto-commit-main`（`cancel-in-progress: false`）排队串行——回推类 workflow 禁用 `true`（会取消还没 push 的运行，丢提交）；定时任务不要另找时间错峰，靠共用分组排队
+- 并发：直接推 main 的 workflow（update-readme / update-actionlint）共用 `concurrency.group: auto-commit-main`（`cancel-in-progress: false`）排队串行——回推类 workflow 禁用 `true`（会取消还没 push 的运行，丢提交）；定时任务不要另找时间错峰，靠共用分组排队；sync-* 推的是 `sync/*` 分支、不直接推 main，用独立分组（`sync-<name>`），不共用此分组
 - 回推前一律 `git pull --rebase`（排队只保证不同时跑，不保证 base 最新，避免 non-fast-forward）
 - 防循环链：`skills/**` 变更 → update-readme → 只提交 `README.md`（不在 `skills/**` 内）→ 终止；**改 update-readme.yml 时保留 `paths` 过滤**
 - 上传 `.github/workflows/` 文件一律用 git push（REST API 无 Workflows 权限）
@@ -28,9 +28,10 @@
 
 - `update-readme.yml`：push 到 main 且匹配 `paths: ['skills/**']`（或手动）→ 跑脚本 → 只提交 `README.md`
 - `update-actionlint.yml`：每周一 03:00 UTC + 手动兜底（**push 不触发**）→ 轮询 rhysd/actionlint → 有新版提交 `actionlint.exe` + `actionlint.version`；**只有无更新才静默，拉取失败必须抛错染红**
-- 路径坑：actionlint 脚本在**技能目录** `skills/github-actions/scripts/update-actionlint.ps1`，**不在仓库根 `scripts/`**（后者只有 update-readme.ps1）——两个 workflow 的调用路径不同，别搞混（曾因此踩坑）
-- `sync-obra-superpowers.yml`：thin caller，只填 5 个 inputs；同步逻辑在可复用模板 `sync-upstream-skills.yml`（`workflow_call`，不独立运行）
-- **新增上游同步**：复制 caller 为 `sync-<name>.yml` → 改 inputs（`dst_dir` 必须 `skills/<name>` 顶层）→ cron / concurrency 照抄 → 模板自动写 `.mirror` 标记（无需改脚本）→ 立即冒烟
+- 路径坑：actionlint 脚本在**技能目录** `skills/github-actions/scripts/update-actionlint.ps1`，**不在仓库根 `scripts/`**（后者是 `update-readme.ps1` + `install-skills.ps1`，与技能目录无关）——两个 workflow 的调用路径不同，别搞混（曾因此踩坑）
+- 一键安装：`./scripts/install-skills.ps1` 把 `skills/` 全量（含 `.mirror` 上游镜像）覆盖安装到 OpenCode 技能目录（默认 `~/.config/opencode/skills`，可用 `-Destination` 改目标，`-Clean` 清理残留，`-WhatIf` 预览，幂等可重跑）
+- `sync-obra-superpowers.yml`：thin caller，只填 6 个 inputs；同步逻辑在可复用模板 `sync-upstream-skills.yml`（`workflow_call`，不独立运行）；模板推固定分支（`sync/<name>`）开 PR，review 后手动合并
+- **新增上游同步**：复制 caller 为 `sync-<name>.yml` → 改 inputs（`dst_dir` 必须 `skills/<name>` 顶层）→ concurrency 用独立分组 `sync-<name>` → 模板自动写 `.mirror` 标记（无需改脚本）→ 立即冒烟
 
 ## 技能内容约束（bootstrapblazor 示例）
 

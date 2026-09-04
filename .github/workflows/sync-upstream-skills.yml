@@ -1,21 +1,27 @@
 name: sync-upstream-skills
-# 可复用模板（reusable workflow）：从上游仓库全量镜像 skills 到本地目录。
+# 可复用模板（reusable workflow）：从上游仓库全量镜像 skills 到本地目录，以固定分支 PR 方式提交人工 review。
 # 自身 on 只有 workflow_call，不独立运行。
 #
 # 新增同步需求只需新建 thin caller .github/workflows/sync-<name>.yml：
-#   1. schedule 照抄 '0 3 * * 1'（与其它回推 workflow 同一时刻触发，靠共用 concurrency 排队串行，不要另找时间错峰）
-#   2. concurrency.group 必须用 auto-commit-main（cancel-in-progress: false）
-#   3. permissions.contents: write（自动提交用）
+#   1. schedule 照抄 '0 3 * * 1'（与其它定时任务同一时刻触发；本模板推的是 sync-* 分支、不直接推 main，
+#      与 update-readme / update-actionlint 无推 main 冲突，不要另找时间错峰）
+#   2. concurrency.group 用独立分组 sync-<name>（cancel-in-progress: false；只防“同一定时任务并行/手动冒烟撞车”，
+#      不再共用 auto-commit-main——该分组只给直接推 main 的 update-readme / update-actionlint 用）
+#   3. permissions 必须 contents: write + pull-requests: write（推固定分支 + 创建/更新 PR 用）
 #   4. jobs 里 uses: ./.github/workflows/sync-upstream-skills.yml 并填 inputs（见文末调用示例）
 #   5. dst_dir 必须在 skills/ 顶层（如 skills/<name>）；镜像成功后 update-readme.ps1 靠目录内
 #      .mirror 标记自动将其排除出自建技能表，无需改脚本
-#   6. 上传 workflow 文件一律 git push（REST API 无 Workflows 权限）
-#   7. 新增/修改后必须立即 gh workflow run sync-<name>.yml 手动冒烟一次，不得等调度窗口
+#   6. pr_branch 固定分支名（默认 sync/<dst 末段>，如 skills/obra-superpowers → sync/obra-superpowers）；
+#      显式传入更清晰，定时任务有更新时创建或更新该分支的 PR，无更新静默跳过，review 后手动合并
+#   7. 上传 workflow 文件一律 git push（REST API 无 Workflows 权限）
+#   8. 新增/修改后必须立即 gh workflow run sync-<name>.yml 手动冒烟一次，不得等调度窗口
 #
 # 约定（拉取失败必须抛错，只有无更新才静默）：
-#   - 上游仓库被删/改名、无分支、无源目录 → throw，job 变红，不动本地、不提交
+#   - 上游仓库被删/改名、无分支、无源目录 → throw，job 变红，不动本地、不开 PR
 #   - 完全镜像：先删本地目录再拷，上游删了本地跟着删；.mirror 标记内容固定（无时间戳），避免无意义 diff
-#
+#   - PR 合并到 main 后会触发 update-readme（paths: skills/**），但镜像目录被 .mirror 排除、不计入技能表 →
+#     README 无变化则静默，递归终止
+
 # 调用示例（sync-<name>.yml 全文）：
 #   name: sync-foo
 #   on:
@@ -24,8 +30,9 @@ name: sync-upstream-skills
 #     workflow_dispatch:
 #   permissions:
 #     contents: write
+#     pull-requests: write
 #   concurrency:
-#     group: auto-commit-main
+#     group: sync-foo
 #     cancel-in-progress: false
 #   jobs:
 #     sync:
@@ -36,6 +43,7 @@ name: sync-upstream-skills
 #         src_dir: skills
 #         dst_dir: skills/foo-bar
 #         commit_message: 'chore: 同步上游 foo/bar skills 镜像'
+#         pr_branch: sync/foo-bar
 
 on:
   workflow_call:
@@ -59,12 +67,22 @@ on:
         required: true
         type: string
       commit_message:
-        description: '有变更时的提交信息'
+        description: '有变更时的提交信息（同时作为 PR 标题）'
         required: true
+        type: string
+      pr_branch:
+        description: '固定 PR 分支名（默认 sync/<dst 末段>，如 skills/obra-superpowers → sync/obra-superpowers）'
+        default: ''
+        required: false
         type: string
 
 permissions:
-  contents: write               # GITHUB_TOKEN 自动提交镜像变更
+  contents: write               # 推固定分支用
+  pull-requests: write          # 创建/更新 PR 用
+
+concurrency:
+  group: sync-${{ inputs.dst_dir }}
+  cancel-in-progress: false     # 同一同步任务排队串行；不同 dst_dir 分支不同，互不干扰
 
 jobs:
   sync:
@@ -97,23 +115,40 @@ jobs:
           } finally {
             Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
           }
-      - name: 有变更则自动提交
+      - name: 有变更则提交到固定分支 PR
         shell: pwsh
         env:
           DST_DIR: ${{ inputs.dst_dir }}
           COMMIT_MESSAGE: ${{ inputs.commit_message }}
+          PR_BRANCH: ${{ inputs.pr_branch }}
+          UPSTREAM_REPO: ${{ inputs.upstream_repo }}
+          UPSTREAM_BRANCH: ${{ inputs.upstream_branch }}
+          SRC_DIR: ${{ inputs.src_dir }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          # 防循环：只提交镜像目录，不触碰 .github/workflows/**；
-          # 该目录被 update-readme.ps1（.mirror 标记）排除，不计入自建技能表 →
-          # 提交会触发 update-readme（paths: skills/**），而后者只提交 README.md → 递归终止。
+          $ErrorActionPreference = 'Stop'
+          # 固定分支名：未显式传入时按 dst 末段推导（skills/obra-superpowers → sync/obra-superpowers）
+          $branch = $env:PR_BRANCH
+          if ([string]::IsNullOrWhiteSpace($branch)) {
+            $leaf = Split-Path $env:DST_DIR -Leaf
+            $branch = "sync/$leaf"
+          }
           git add $env:DST_DIR
           if (git diff --cached --quiet) {
-            Write-Output '上游无更新，跳过提交'
+            Write-Output '上游无更新，跳过 PR'
+            exit 0
+          }
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -B $branch         # 暂存区变更随分支携带：新分支 = 最新 main + 本次镜像变更
+          git commit -m $env:COMMIT_MESSAGE
+          git push -f origin "HEAD:$branch"   # -f：同名分支已有旧同步提交时直接覆盖，保证 PR 永远是“最新 main + 最新上游”
+          # 同名 PR 已存在则只推分支（PR 自动更新），不存在才新建
+          $existing = gh pr list --head $branch --base main --json url --jq '.[0].url' 2>$null
+          if ([string]::IsNullOrWhiteSpace($existing)) {
+            $body = "上游仓库: $env:UPSTREAM_REPO`n上游分支: $env:UPSTREAM_BRANCH`n源目录: $env:SRC_DIR`n目标目录: $env:DST_DIR`n`n由 sync workflow 自动生成，review 后手动合并。"
+            gh pr create --base main --head $branch --title $env:COMMIT_MESSAGE --body $body
+            Write-Output '已创建 PR'
           } else {
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git commit -m $env:COMMIT_MESSAGE
-            git pull --rebase               # 同组排队只保证不同时跑，不保证 base 最新；推前 rebase 避免 non-fast-forward
-            git push
-            Write-Output '已自动提交并推送'
+            Write-Output "已更新已有 PR: $existing"
           }
