@@ -1,9 +1,3 @@
-# Just-Silver Skills
-
-个人自用的 OpenCode 技能集：自建规范与工具技能为主，附上游全量镜像（自动同步）。
-
-下表仅收录自建技能（自动生成，不含镜像目录）；分组技能以 `分组 / 技能` 展示嵌套关系。
-
 <!-- AUTO-GENERATED: 技能表格由 scripts\update-readme.ps1 生成，请勿手改 -->
 
 | 技能 | 介绍 | 跳转位置 |
