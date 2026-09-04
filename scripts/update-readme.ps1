@@ -4,13 +4,9 @@ $root = Split-Path $PSScriptRoot -Parent
 $skillsDir = Join-Path $root 'skills'
 if (-not (Test-Path $skillsDir)) { throw "未找到 skills 目录: $skillsDir" }
 
-$rows = @()
-Get-ChildItem $skillsDir -Directory | Sort-Object Name | ForEach-Object {
-    $dirName = $_.Name
-    $skPath = Join-Path $_.FullName 'SKILL.md'
-    if (-not (Test-Path $skPath)) { Write-Warning "跳过（无 SKILL.md）: $dirName"; return }
+function Add-SkillRow([string]$skPath, [string]$relDir) {
     $content = Get-Content $skPath -Raw
-    $name = $dirName
+    $name = Split-Path $relDir -Leaf
     $desc = ''
     if ($content -match '(?ms)^---\r?\n(.*?)\r?\n---\r?\n') {
         $fm = $Matches[1]
@@ -19,8 +15,28 @@ Get-ChildItem $skillsDir -Directory | Sort-Object Name | ForEach-Object {
     }
     if ($desc.Length -gt 110) { $desc = $desc.Substring(0, 107) + '...' }
     $desc = $desc -replace '\|', '\|'
-    $rows += "| $name | $desc | [skills/$dirName/](skills/$dirName/) |"
+    $relDir = $relDir -replace '\\', '/'
+    $script:rows += "| $name | $desc | [skills/$relDir/](skills/$relDir/) |"
 }
+$rows = @()
+$exclude = @('obra-superpowers')  # 上游镜像目录（sync-obra-superpowers.yml 维护），不计入自建技能表
+Get-ChildItem $skillsDir -Directory | Where-Object { $exclude -notcontains $_.Name } | Sort-Object Name | ForEach-Object {
+    $skPath = Join-Path $_.FullName 'SKILL.md'
+    if (Test-Path $skPath) {
+        # 顶层技能：skills/<name>/SKILL.md
+        Add-SkillRow $skPath $_.Name
+    } else {
+        # 分组技能：skills/<group>/<name>/SKILL.md（如 skills/sdlc/）
+        $group = $_
+        $found = $false
+        Get-ChildItem $group.FullName -Directory | Sort-Object Name | ForEach-Object {
+            $subSk = Join-Path $_.FullName 'SKILL.md'
+            if (Test-Path $subSk) { Add-SkillRow $subSk ($group.Name + '/' + $_.Name); $found = $true }
+        }
+        if (-not $found) { Write-Warning "跳过（无 SKILL.md）: $($group.Name)" }
+    }
+}
+$rows = @($rows | Sort-Object)
 
 $table = $rows -join "`n"
 $readmePath = Join-Path $root 'README.md'
