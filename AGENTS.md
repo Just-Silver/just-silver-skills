@@ -29,7 +29,7 @@
 - `update-readme.yml`：push 到 main 且匹配 `paths: ['skills/**']`（或手动）→ 跑脚本 → 只提交 `README.md`
 - `update-actionlint.yml`：每周一 03:00 UTC + 手动兜底（**push 不触发**）→ 轮询 rhysd/actionlint → 有新版提交 `actionlint.exe` + `actionlint.version`；**只有无更新才静默，拉取失败必须抛错染红**
 - 路径坑：actionlint 脚本在**技能目录** `skills/github-actions/scripts/update-actionlint.ps1`，**不在仓库根 `scripts/`**（后者与技能目录无关）——两个 workflow 的调用路径不同，别搞混（曾因此踩坑）
-- 一键安装：命令窗粘贴 `irm https://raw.githubusercontent.com/Just-Silver/just-silver-skills/main/scripts/install-skills.ps1 | iex` 即可（脚本在 `scripts/install-skills.ps1`）；远程拉 main.zip → 原子替换全局 `skills/just-silver-skills/`，不动他人技能，幂等可重跑
+- 一键安装：Git Bash 命令窗粘贴 `curl -fsSL https://raw.githubusercontent.com/Just-Silver/just-silver-skills/main/scripts/install-skills.sh | bash` 即可（脚本在 `scripts/install-skills.sh`）；远程拉 main.tar.gz → 原子替换全局 `skills/just-silver-skills/`，不动他人技能，幂等可重跑
 - `sync-obra-superpowers.yml`：thin caller，只填 6 个 inputs；同步逻辑在可复用模板 `sync-upstream-skills.yml`（`workflow_call`，不独立运行）；模板推固定分支（`sync/<name>`）开 PR，review 后手动合并；前置要求仓库 Settings → Actions → General 勾选 Allow GitHub Actions to create and approve pull requests
 - **新增上游同步**：复制 caller 为 `sync-<name>.yml` → 改 inputs（`dst_dir` 必须 `skills/<name>` 顶层）→ concurrency 用独立分组 `sync-<name>` → 模板自动写 `.mirror` 标记（无需改脚本）→ 立即冒烟
 

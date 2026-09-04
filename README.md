@@ -1,8 +1,10 @@
 ## 一键安装
 
-```powershell
-irm https://raw.githubusercontent.com/Just-Silver/just-silver-skills/main/scripts/install-skills.ps1 | iex
+```bash
+curl -fsSL https://raw.githubusercontent.com/Just-Silver/just-silver-skills/main/scripts/install-skills.sh | bash
 ```
+
+Windows 请在 Git Bash（或任意带 bash 的命令窗）中执行；无需先克隆仓库，自动拉取最新版并原子替换全局 `skills/just-silver-skills/`，不动他人技能，幂等可重跑。
 
 <!-- AUTO-GENERATED: 技能表格由 scripts\update-readme.ps1 生成，请勿手改 -->
 
