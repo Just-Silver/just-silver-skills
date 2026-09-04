@@ -1,4 +1,4 @@
-## 一键安装
+## 一键安装/更新
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Just-Silver/just-silver-skills/main/scripts/install-skills.sh | bash
