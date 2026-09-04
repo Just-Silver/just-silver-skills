@@ -28,15 +28,17 @@
 
 - 触发：`schedule` 每周一 03:00 UTC + `workflow_dispatch` 手动兜底（**push 不触发**）
 - 职责：轮询 rhysd/actionlint 上游最新版 → 有新版本自动提交 `skills/github-actions/scripts/actionlint.exe` + `actionlint.version`（无更新则跳过）
+- 并发：与 sync-obra-superpowers / update-readme 共用 `concurrency.group: auto-commit-main`（`cancel-in-progress: false`），同一时刻触发时排队串行，保证回推有序、不冲突
 - 路径注意：脚本在**技能目录** `skills/github-actions/scripts/update-actionlint.ps1`，**不在仓库根 `scripts/`**（后者只有 update-readme.ps1）——两个 workflow 的调用路径不同，别搞混（曾因此踩坑）
 - 防循环：自动提交只改 `skills/**` 下校验器文件 → 会触发 update-readme（paths: skills/**）→ 后者只提交 README.md → 终止
 - **教训**：新增/修改 schedule 类 workflow 后必须立即 `gh workflow run` 手动冒烟一次，不得等调度窗口（路径 bug 曾潜伏到首次手动触发才暴露）
 
 ### sync-obra-superpowers.yml
 
-- 触发：`schedule` 每周一 04:00 UTC（与 update-actionlint 的 03:00 错开，避免并发 push 冲突）+ `workflow_dispatch` 手动兜底（**push 不触发**）
+- 触发：`schedule` 每周一 03:00 UTC（与 update-actionlint 同一时刻触发，靠共用 concurrency 排队串行）+ `workflow_dispatch` 手动兜底（**push 不触发**）
 - 职责：`git clone --depth 1` 上游 obra/superpowers → 全量镜像其 `skills/` 到 `skills/obra-superpowers/`（完全镜像：先删本地目录再拷，上游删了本地跟着删）→ 有差异自动提交
 - 防循环：自动提交只改 `skills/**` 下镜像文件 → 会触发 update-readme（paths: skills/**）→ 后者只提交 README.md → 终止（镜像目录在 update-readme.ps1 排除名单内，不污染自建技能表）
+- 并发：与 update-actionlint / update-readme 共用 `concurrency.group: auto-commit-main`（`cancel-in-progress: false`），撞车时排队串行，保证回推有序、不冲突
 - **教训**：新增/修改 schedule 类 workflow 后必须立即 `gh workflow run` 手动冒烟一次，不得等调度窗口
 
 ## 技能内容约束（bootstrapblazor 示例）

@@ -46,6 +46,7 @@ GitHub Actions 与 Gitea Actions 约 95% 语法通用（后者兼容前者）。
 - `secrets` 误用于 `if`、`pull_request_target` 滥用、tag 回推忘 `HEAD:main`
 - 硬编码 `http://server:3500` / 固定 `owner/repo` → 用 `${{ github.server_url }}/${{ github.repository }}/${{ github.ref_name }}` 动态拼接（`gitea-differences.md` Release/回推通用模板，push 需去协议头）
 - 发版流水线未校验 `tag == CHANGELOG == package.json` 或 Release body 非来自 `CHANGELOG.md`（见 `changelog-conventions.md` 一致性卡点）→ CD 发版必须从 `CHANGELOG.md` 该版本小节提取 body，`git log` 堆砌属违规
+- 带 `git push` 回推的 workflow 用 `cancel-in-progress: true` 或各用不同 `group` 名 → 取消丢提交 / 照样 push 冲突；须多个 workflow 共用同一 `group` 名 + `cancel-in-progress: false` 排队（见 `ci-cd-practices.md`「多 workflow 回推排队」）
 
 ## 发版（CD）落地清单
 

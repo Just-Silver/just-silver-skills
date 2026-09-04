@@ -9,8 +9,6 @@ description: Use when handling user input, secrets, tokens, or file paths, when 
 
 把每个外部输入当敌对，每个 secret 当圣物，每次鉴权当必查。安全不是阶段，是压在每行碰用户数据、鉴权、外部系统代码上的约束。先画威胁模型再上手段：没说清信任边界的功能不配谈安全。
 
-参考：`addyosmani/agent-skills` 的 `security-and-hardening`（STRIDE、Three-Tier Boundary、OWASP Top 10）。
-
 ## When to Use
 
 - 碰用户输入、文件路径、shell 命令拼接时

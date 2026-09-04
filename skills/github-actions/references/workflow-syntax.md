@@ -66,6 +66,22 @@
     contents: write
   ```
 
+## `concurrency`（并发互斥 / 排队）
+
+- 两级作用域：顶层（整个 workflow 一次只跑一个）与 `jobs.<id>.concurrency`（单个 job 互斥）。**同名 `group` 跨 workflow 也互斥**——多 workflow 回推排队的关键就靠这一点。
+- 两种写法：字符串简写（默认排队不取消）与完整写法：
+  ```yaml
+  concurrency: ci-${{ github.ref }}
+  # 等价于
+  concurrency:
+    group: ci-${{ github.ref }}
+    cancel-in-progress: false
+  ```
+- `cancel-in-progress: true` → 新运行取消组内旧的排队/进行中（CI 省 runner 分钟，见 ci-cd-practices.md 骨架）。
+- `cancel-in-progress: false`（默认值，可省略）→ 组内排队等待，一次只跑一个（**带 `git push` 回推的 workflow 必须用此模式**，见 ci-cd-practices.md「多 workflow 回推排队」）。
+- `group` 命名：常用 `${{ github.ref }}` 按分支隔离；**需互斥的多个 workflow 必须用完全相同的 `group` 名**（如 `pushback-${{ github.ref }}`），否则各排各的队，照样冲突。
+- 可用上下文受限：仅 `github` / `inputs` / `vars`（见 contexts.md）——`secrets` / `matrix` / `needs` 在此不可用。
+
 ## `jobs`
 
 - `jobs.<id>`：`runs-on`、`needs`、`if`、`steps`、`strategy`、`services`、`container`、`timeout-minutes`、`continue-on-error`、`outputs`、`env`、`defaults`、`permissions`、`concurrency`

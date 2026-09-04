@@ -7,6 +7,10 @@ on:
 permissions:
   contents: write               # 自动提交更新后的校验器
 
+concurrency:
+  group: auto-commit-main
+  cancel-in-progress: false     # 与 sync-obra-superpowers / update-readme 共用分组：撞车时排队串行，保证回推有序、不冲突
+
 jobs:
   update:
     runs-on: windows-latest

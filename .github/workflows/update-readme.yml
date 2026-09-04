@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write               # GITHUB_TOKEN 自动提交 README
 
+concurrency:
+  group: auto-commit-main
+  cancel-in-progress: false     # 与两个定时任务共用分组：bot 推送触发的本次运行也要排队，保证回推有序、不冲突
+
 jobs:
   generate:
     runs-on: windows-latest

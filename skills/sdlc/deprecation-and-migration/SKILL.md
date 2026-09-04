@@ -9,8 +9,6 @@ description: Use when removing an old API, feature, or distribution channel, whe
 
 代码是负债不是资产。每行代码都有持有成本：修 bug、跟依赖、打补丁、新人理解。废弃是主动清偿负债的纪律，迁移是把用户安全送到新实现的过程。组织擅长建造，不擅长拆除——本技能补这一块。
 
-参考：`addyosmani/agent-skills` 的 `deprecation-and-migration`（Code-is-liability、Compulsory vs Advisory、Churn Rule、迁移四步）。
-
 ## When to Use
 
 - 删除旧 API、旧功能、旧分发渠道前

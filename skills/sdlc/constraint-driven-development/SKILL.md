@@ -9,8 +9,6 @@ description: Use when no quality bar is written down, when setting up constraint
 
 spec 说造什么，TDD 证明能跑，约束定义什么算"好到能发"。agent 一下午写的比你一周读的多，判断必须从人脑搬进持续运行的检查：检查要存在，要有你亲定的数字，要离活足够近让 agent 自己修。
 
-参考：`addyosmani/agent-skills` 的 `constraint-driven-development`（Floor、Ratchets、Exceptions、四问、CONSTRAINTS.md）。
-
 ## When to Use
 
 - 开新项目/大功能且质量 bar 没写下来时

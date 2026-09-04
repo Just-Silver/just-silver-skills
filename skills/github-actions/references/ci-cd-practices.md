@@ -82,6 +82,21 @@ jobs:
 
 > **含数据库/外部依赖的测试**：用 job 级 `services` 起容器（如 postgres，配 health-cmd 等健康检查），测试连接 `localhost:端口`。语法见 workflow-syntax.md。
 
+### 多 workflow 回推排队（防 `git push` 冲突）
+
+多个 workflow 同时带 `git push` 回仓库时（如 update-readme 自动提交 + actionlint 二进制更新 + 镜像同步），会因基于旧 base 提交而 push 冲突失败。此时**不得**用 `cancel-in-progress: true`（会取消掉还没 push 的运行，丢提交），必须让同组排队串行：
+
+```yaml
+# 每个带回推的 workflow 顶层都写完全相同的 group
+concurrency:
+  group: pushback-${{ github.ref }}
+  cancel-in-progress: false   # 默认值，可省略；组内排队，一次只跑一个
+```
+
+- **同名是关键**：组名按 `group` 字符串跨 workflow 互斥。各 workflow 若 group 名不同（如各用各的 `ci-...`），等于没排队，照样冲突。
+- 回推步骤本身仍要 `git pull --rebase` 后再 `git push`（排队只保证不同时跑，不保证 base 最新）。
+- CI 纯检查类 workflow 继续用 `cancel-in-progress: true` 省 runner；只有**带写回**（push / Release / 镜像同步提交）的 workflow 进 `pushback-` 组。
+
 ### Gitea 等价
 
 同一骨架可直接放到 `.gitea/workflows/`（事件、concurrency、permissions、setup-node 均支持）。注意：Gitea 默认没有 GitHub-hosted runner，`runs-on` 标签映射到 job 容器镜像；`cache: 'npm'` 依赖 Gitea 实例的 actions 缓存配置。语法差异一律以 gitea-differences.md 为准。
