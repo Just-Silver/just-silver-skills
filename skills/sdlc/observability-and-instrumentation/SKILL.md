@@ -27,11 +27,11 @@ description: Use when adding logging, metrics, tracing, or alerting, when shippi
 无问题的埋点即噪音。动码前写下值班会问的 2-4 个问题，每个信号必须回答其中之一：
 
 ```
-功能：gitea-agent 处理 issue 评论触发
+功能：处理外部事件触发（如 webhook/队列消息）
 值班会问：
 1. 触发成功率多少？哪步失败最多？
-2. 失败时卡在哪段？（收 webhook / 解析 / 调 API / 回评论）
-3. Gitea API 是不是比平时慢？
+2. 失败时卡在哪段？（接收 / 解析 / 调外部 API / 回写）
+3. 外部依赖是不是比平时慢？
 ```
 
 答不上问题即不配埋点——先想清再动手。
@@ -68,7 +68,7 @@ description: Use when adding logging, metrics, tracing, or alerting, when shippi
 
 ## Trace
 
-- 入口生成 traceId，`webhook_recv → parse_event → gitea_api → post_comment` 每段一个 span，开始/结束打点（`trace_id, stage, elapsed_ms, status`）
+- 入口生成 traceId，`接收 → 解析 → 调外部依赖 → 回写` 每段一个 span，开始/结束打点（`trace_id, stage, elapsed_ms, status`）
 - 错误带段名往上抛，顶层统一 `request_failed`，一眼断段
 - 跨异步边界透传（header/消息元数据），否则 trace 断在缝上；默认低采样，错误全留
 - `grep trace_id` 即完整时间线：缺结束日志/标 fail 的段即案发段

@@ -14,7 +14,7 @@ description: Use when handling user input, secrets, tokens, or file paths, when 
 - 碰用户输入、文件路径、shell 命令拼接时
 - 存 token/secret、做鉴权、调外部 API 时
 - 加文件上传、webhook、回调时
-- 审计依赖漏洞（`npm audit` / `dotnet list package --vulnerable`）时
+- 审计依赖漏洞（本仓包管理器原生审计）时
 - 合并前做安全 review 时
 
 **When NOT to use:**
@@ -37,10 +37,10 @@ description: Use when handling user input, secrets, tokens, or file paths, when 
 
 - 外部输入在系统边界校验（CLI 参数、API 路由、文件路径），校验完再用
 - 数据库查询参数化，禁字符串拼接 SQL
-- 输出编码防注入（shell 用参数数组 + `shell:false`，不用 `exec` 拼字符串）
-- 外部通信走 HTTPS；密码 bcrypt/scrypt/argon2 存哈希
-- 发版前跑包管理器原生审计（`npm audit` / `dotnet list package --vulnerable`），high+ 必须处置
-- 路径用 `resolve→realpath` 规范化，拒空/`\0`/超长/以 `-` 开头，传参用数组 + `--` 分隔
+- 输出编码防注入（命令与参数分离传参，不拼字符串执行）
+- 外部通信走 HTTPS；密码用慢哈希（bcrypt/scrypt/argon2 类）存哈希，禁明文
+- 发版前跑本仓包管理器原生审计，high+ 必须处置
+- 路径用规范化（resolve/realpath 类）后断言仍在根内，拒空/截断符/超长/以 `-` 开头，传参用数组 + `--` 分隔
 
 ### Ask First（需人批准）
 
@@ -63,16 +63,16 @@ description: Use when handling user input, secrets, tokens, or file paths, when 
 ```
 代码 ← 只读环境变量，无值即报错退出，不给默认值
 本地 ← .env（gitignore）+ .env.example 占位
-CI   ← Gitea/GH Secrets → ${{ secrets.X }} → 环境变量，不 echo 不落盘
+CI   ← 平台 Secrets → 环境变量注入，不 echo 不落盘
 生产 ← 部署平台/密钥管理，CI 永远不持生产密钥
-泄露 ← 按已泄露处理：吊销重建 + git filter-repo 清历史，光 git rm 不够
+泄露 ← 按已泄露处理：吊销重建 + 清 git 历史（filter-repo 类），光删除文件不够
 ```
 
-## 注入与遍历（本仓高频）
+## 注入与遍历
 
-- 命令注入：`--target="a;rm -rf /"`、`$(id)`、反引号、`&&|||`——解法：`spawnSync(cmd, args[])` + `shell:false`，输入只当 `cwd`/参数，不进命令字符串
-- 参数注入：`--target="--upload-pack=..."` 以 `-` 开头被当 option——解法：拒 `-` 开头 + `--` 分隔
-- 路径遍历：`--target="../../etc"` + `join+writeFileSync` 写出仓外——解法：`resolve→realpath` 后断言仍在根内，`existsSync+isDirectory`，非目标目录拒绝
+- 命令注入：`target="a;rm -rf /"`、`$(...)`、反引号、`&&|||`——解法：命令与参数分离传参（参数数组/无 shell 模式），输入只当参数/工作目录，不进命令字符串
+- 参数注入：`target="--upload-pack=..."` 以 `-` 开头被当 option——解法：拒 `-` 开头 + `--` 分隔
+- 路径遍历：`target="../../etc"` + 拼接写盘写出仓外——解法：规范化（resolve/realpath 类）后断言仍在根内，确认存在且是目录，非目标拒绝
 - SQL 注入：参数化 / ORM，禁拼接
 - XSS/输出注入：框架自动转义，不绕过；必须渲染 HTML 先 sanitize
 
@@ -89,8 +89,8 @@ audit 报 high+ → 先判可达性（走不走那条路径）
 
 | 场景 | 动作 |
 |------|------|
-| 用户输入进命令 | 参数数组 + shell:false，不拼字符串 |
-| 路径输入 | resolve→realpath→断言在根内→isDirectory |
+| 用户输入进命令 | 命令与参数分离传参，不拼字符串 |
+| 路径输入 | 规范化→断言在根内→确认是目录 |
 | token/secret | 环境变量 + Secrets，禁代码/日志/git |
 | 发版前 | 原生审计跑一次，high+ 有处置记录 |
 | 碰边界 | 先 STRIDE 5 分钟 + abuse case 当首测 |
@@ -109,7 +109,7 @@ audit 报 high+ → 先判可达性（走不走那条路径）
 
 ## Red Flags — STOP
 
-- shell 字符串拼接用户输入（`exec("..."+input)`）
+- shell 字符串拼接用户输入（命令与变量拼成一个字符串执行）
 - 路径未规范化即 `join+write`
 - secret 进代码/git/日志
 - audit high+ 无处置记录

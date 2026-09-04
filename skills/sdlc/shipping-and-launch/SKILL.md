@@ -1,6 +1,6 @@
 ---
 name: shipping-and-launch
-description: Use when shipping a versioned release with git tag, CHANGELOG, and Gitea/GitHub Release, before pushing tag or publishing Release, when verifying tag, CHANGELOG, and package version consistency, or when planning staged rollout and rollback.
+description: Use when shipping a versioned release with git tag, CHANGELOG, and Release, before pushing tag or publishing Release, when verifying tag, CHANGELOG, and package version consistency, or when planning staged rollout and rollback.
 ---
 
 # Shipping and Launch（版本发布与回滚）
@@ -11,7 +11,7 @@ description: Use when shipping a versioned release with git tag, CHANGELOG, and 
 
 ## When to Use
 
-- 打 `v*` tag、发 Gitea/GitHub Release 前
+- 打 `v*` tag、发 Release 前
 - 检查一次发版是否合规（tag、CHANGELOG、包版本三处是否一致）
 - 定分阶段放量、回滚预案时
 - CI 发版链路失败（version consistency / Release body 提取失败）后修复时
@@ -19,16 +19,16 @@ description: Use when shipping a versioned release with git tag, CHANGELOG, and 
 **When NOT to use:**
 
 - 日常开发提交（无 tag、无 Release）
-- 只改 workflow 语法不涉及发版（用 `github-actions`）
+- 只改流水线语法不涉及发版
 - 纯文档改动无版本变更
 
 ## Pre-flight（push tag 前必过）
 
-1. 三处一致：`git tag vX.Y.Z` == `CHANGELOG.md` 顶部 `## [X.Y.Z] - YYYY-MM-DD` == 包版本（`package.json#version` / `*.csproj<Version>` / 等价清单）。不一致即停，不打 tag。
+1. 三处一致：`git tag vX.Y.Z` == `CHANGELOG.md` 顶部 `## [X.Y.Z] - YYYY-MM-DD` == 包版本清单（本仓的版本单一来源）。不一致即停，不打 tag。
 2. CHANGELOG 小节存在且非空：Unreleased 已整理为版本小节，按 Keep a Changelog 分组（Added/Changed/Fixed 等），至少列出 breaking changes。空小节不发版。
-3. 产物可构建：本地构建一次通过（如 `dotnet build -c Release` / `npm run build`），单文件产物版本号与 tag 一致。
+3. 产物可构建：本地跑本仓构建命令一次通过，产物版本号与 tag 一致。
 4. 测试全绿：跑本仓门禁命令全绿后再打 tag。
-5. 确认发布面：是否触发批量同步（如 `vars.TARGET_REPOS`）、目标仓库是否会被污染，先确认再 push。
+5. 确认发布面：是否触发下游同步/批量分发、目标是否会被污染，先确认再 push。
 
 ## Release Body 规则
 
@@ -44,8 +44,8 @@ description: Use when shipping a versioned release with git tag, CHANGELOG, and 
 线上严重 bug → 发 patch 版本（如 vX.Y.Z+1），永不复用旧 tag
 ```
 
-- Gitea：先删 Release 再 `git push --delete origin vX.Y.Z`。
-- CD 附件幂等覆盖：旧版附件从上个 tag 重新构建上传。
+- 平台通用：先删线上 Release 再删远端 tag（`git push --delete origin vX.Y.Z`）。
+- 发布附件幂等覆盖：旧版附件从上个 tag 重新构建上传。
 
 ## Quick Reference
 

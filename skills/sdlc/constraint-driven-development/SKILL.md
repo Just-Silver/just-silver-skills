@@ -25,8 +25,8 @@ spec 说造什么，TDD 证明能跑，约束定义什么算"好到能发"。age
 
 ## Floor（底线，无需配置，永远执行）
 
-- 无新增压制注释：`#pragma warning disable`、`// <ExcludeFromCodeCoverage>`、`# noqa`、`@ts-ignore`、`eslint-disable` 类
-- 无未实现 stub：`throw new NotImplementedException()`、`TODO` 空实现、空 `catch {}`
+- 无新增压制注释：各类 `disable warning` / `ignore error` / `exclude from coverage` / `nolint` / `noqa` / `ts-ignore` / `eslint-disable` 类
+- 无未实现 stub：抛 `NotImplemented` 占位、`TODO` 空实现、空 `catch {}`
 - 无故跳过/删除测试：删测必须在 commit message 写原因
 - 源码无 secrets
 - **本文件不许为放行而弱化**：改弱 bar 本身即违规，需单独 review
@@ -65,12 +65,12 @@ Last reviewed: YYYY-MM-DD by @who
 
 | 维度 | 规则 | 检查命令 | 时机 |
 |------|------|----------|------|
-| 类型 | 零错误 | `dotnet build -c Release` | 每次编辑 |
-| 格式 | 零错误 | `dotnet format --verify-no-changes` | 每次编辑 |
-| 测试 | 全绿 | `dotnet test` | 任务结束 + CI |
-| 覆盖率 | 变更行 ≥80% | `dotnet test --collect:"XPlat Code Coverage"` + git diff | 任务结束 + CI |
-| secrets | 源码无密钥 | `gitleaks detect --redact --no-banner` | 每次编辑 |
-| 依赖 | 无 high+ 漏洞 | `dotnet list package --vulnerable` | CI |
+| 类型 | 零错误 | 本仓构建命令（如 `tsc --noEmit` / `dotnet build` / `go build ./...`，按仓取一） | 每次编辑 |
+| 格式 | 零错误 | 本仓格式化校验（如 `prettier --check` / `dotnet format` / `gofmt -l`，按仓取一） | 每次编辑 |
+| 测试 | 全绿 | 本仓测试命令（如 `npm test` / `dotnet test` / `go test ./...`，按仓取一） | 任务结束 + CI |
+| 覆盖率 | 变更行 ≥80% | 本仓覆盖率采集 + git diff（按仓取一） | 任务结束 + CI |
+| secrets | 源码无密钥 | 密钥扫描（如 `gitleaks detect`，按仓取一） | 每次编辑 |
+| 依赖 | 无 high+ 漏洞 | 本仓依赖审计（如 `npm audit` / `dotnet list package`，按仓取一） | CI |
 
 每行必须有"检查命令"列。有数字无命令即许愿不是约束。
 
