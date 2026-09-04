@@ -1,3 +1,15 @@
+# just-silver-skills
+
+个人 OpenCode 技能集。
+
+## 安装 / 更新
+
+```powershell
+./scripts/install-skills.ps1
+```
+
+默认安装到 `~/.config/opencode/skills`，全量覆盖（含上游镜像目录，可重复运行）。常用参数：`-Destination <目录>` 改目标位置，`-Clean` 清理仓库已不存在的残留技能，`-WhatIf` 预览变更。
+
 <!-- AUTO-GENERATED: 技能表格由 scripts\update-readme.ps1 生成，请勿手改 -->
 
 | 技能 | 介绍 | 跳转位置 |
