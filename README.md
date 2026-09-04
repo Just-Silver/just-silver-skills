@@ -1,7 +1,7 @@
 ## 一键安装
 
 ```powershell
-./scripts/install-skills.ps1
+irm https://raw.githubusercontent.com/Just-Silver/just-silver-skills/main/scripts/install-skills.ps1 | iex
 ```
 
 <!-- AUTO-GENERATED: 技能表格由 scripts\update-readme.ps1 生成，请勿手改 -->
