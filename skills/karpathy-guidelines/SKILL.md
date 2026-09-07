@@ -15,10 +15,10 @@ Behavioral guidelines to reduce common LLM coding mistakes, derived from [Andrej
 **Don't assume. Don't hide confusion. Surface tradeoffs.**
 
 Before implementing:
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them - don't pick silently.
+- If something is unclear and it affects what you build (behavior, correctness, irreversible actions), stop. Name what's confusing. Ask.
+- If multiple interpretations exist and picking wrong is costly, present them - don't pick silently.
+- If the uncertainty is low-risk and a safe reasonable default exists, state the assumption and proceed - don't block the task for the sake of ceremony. (Trivial details like "which side does the button go on" should not trigger a round-trip.)
 - If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
 
 ## 2. Simplicity First
 
