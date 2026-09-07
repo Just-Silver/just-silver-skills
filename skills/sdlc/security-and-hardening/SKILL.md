@@ -33,12 +33,15 @@ description: Use when handling user input, secrets, tokens, or file paths, when 
 
 ## 三级边界（Always / Ask / Never）
 
-### Always（无例外）
+### Always（跨信任边界的安全默认）
+
+> "无例外"指**安全默认不许妥协**，不是物理世界无例外：本机 IPC / Unix socket / 可信隔离网络等**边界内**传输本就不过这条"外部通信"线（见首条限定）。真正的例外必须先画清信任边界再谈。
 
 - 外部输入在系统边界校验（CLI 参数、API 路由、文件路径），校验完再用
 - 数据库查询参数化，禁字符串拼接 SQL
 - 输出编码防注入（命令与参数分离传参，不拼字符串执行）
-- 外部通信走 HTTPS；密码用慢哈希（bcrypt/scrypt/argon2 类）存哈希，禁明文
+- 跨信任边界的通信走 TLS/HTTPS；本机 IPC / Unix socket / 可信隔离网络等**边界内**传输按威胁模型判断，不因"内部网络"默认免认证、免加密
+- 密码用慢哈希存哈希、禁明文；优先用平台提供的 password hashing API（如 ASP.NET Core `PasswordHasher`，算法与参数由库负责），自实现时用 bcrypt/scrypt/argon2 类
 - 发版前跑本仓包管理器原生审计，high+ 必须处置
 - 路径用规范化（resolve/realpath 类）后断言仍在根内，拒空/截断符/超长/以 `-` 开头，传参用数组 + `--` 分隔
 
@@ -56,7 +59,7 @@ description: Use when handling user input, secrets, tokens, or file paths, when 
 - 客户端校验当安全边界
 - `eval` / shell 字符串拼接跑用户输入
 - 关安全头图方便；向用户暴露堆栈与内部错误细节
-- session/token 放客户端可读存储
+- 浏览器 Web 应用把高权限 session/token 放入可被不可信页面脚本直接读取的存储（localStorage/sessionStorage 等）——优先 HttpOnly + Secure + SameSite Cookie；桌面 / CLI / 移动端等**非浏览器**客户端按平台安全存储机制处理（DPAPI / Keychain / Keystore 等），不套用浏览器禁令
 
 ## Secrets 分层
 

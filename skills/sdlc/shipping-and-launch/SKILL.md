@@ -7,12 +7,20 @@ description: Use when shipping a versioned release with git tag, CHANGELOG, and 
 
 ## Overview
 
-不可重复的发布等于没有发布。每次发布必须可验证（tag==CHANGELOG==包版本）、可追溯（Release body 来自 CHANGELOG 对应小节）、可回退（push 前已知回滚路径）。
+不可重复的发布等于没有发布。每次发布必须可验证（版本单一来源一致）、可追溯（Release body 来自 CHANGELOG 对应小节）、可回退（push 前已知回滚路径）。
+
+## 适用前提：先识别版本单一来源（Single Source of Truth），再谈一致性
+
+本 Skill 的强校验（三处一致）只对**单一版本源仓库**成立（一个 repo 只发布一个版本化产物：单包库 / 单应用）。动手前先识别本仓的版本来源，**不要默认套用三处一致**：
+
+- **单一版本源仓**（单包 / 单应用，如 package.json / *.csproj 与 repo 一一对应）→ 要求 `tag == CHANGELOG == 包版本` 三处一致，可进流水线校验
+- **monorepo / 多制品仓**（root + packages/*，或同时产 Docker 镜像 / NuGet / npm / Python 包）→ 各产物版本号可能各不相同，**没有单一"包版本"可对**；识别每个产物的版本来源（各自 package.json / *.csproj / 镜像 tag），tag 语义与本仓约定对齐，**不得为凑三处一致去改各产物版本号**
+- **多产物混合发布**（镜像 tag / NuGet / npm 版本来源不同）→ 每个产物各自校验"其 CHANGELOG 小节 ↔ 其版本来源"，而不是用一个 tag 对全仓强制统一
 
 ## When to Use
 
 - 打 `v*` tag、发 Release 前
-- 检查一次发版是否合规（tag、CHANGELOG、包版本三处是否一致）
+- 检查一次发版是否合规（版本单一来源各处是否一致）
 - 定分阶段放量、回滚预案时
 - CI 发版链路失败（version consistency / Release body 提取失败）后修复时
 
@@ -24,7 +32,7 @@ description: Use when shipping a versioned release with git tag, CHANGELOG, and 
 
 ## Pre-flight（push tag 前必过）
 
-1. 三处一致：`git tag vX.Y.Z` == `CHANGELOG.md` 顶部 `## [X.Y.Z] - YYYY-MM-DD` == 包版本清单（本仓的版本单一来源）。不一致即停，不打 tag。
+1. 版本单一来源一致：先按上方「适用前提」识别本仓版本来源（单一版本源仓：`git tag vX.Y.Z` == `CHANGELOG.md` 顶部 `## [X.Y.Z] - YYYY-MM-DD` == 包版本清单；monorepo/多制品仓按各自产物版本源校验，不强行统一）。不一致即停，不打 tag。
 2. CHANGELOG 小节存在且非空：Unreleased 已整理为版本小节，按 Keep a Changelog 分组（Added/Changed/Fixed 等），至少列出 breaking changes。空小节不发版。
 3. 产物可构建：本地跑本仓构建命令一次通过，产物版本号与 tag 一致。
 4. 测试全绿：跑本仓门禁命令全绿后再打 tag。
@@ -51,7 +59,7 @@ description: Use when shipping a versioned release with git tag, CHANGELOG, and 
 
 | 场景 | 动作 |
 |------|------|
-| 发版前 | 三处一致 + CHANGELOG 小节 + 构建 + 测试 + 发布面确认 |
+| 发版前 | 版本单一来源一致 + CHANGELOG 小节 + 构建 + 测试 + 发布面确认 |
 | Release body | CHANGELOG 小节截段，禁 `git log` |
 | 未 push 想反悔 | `git tag -d vX.Y.Z` |
 | 已 push 想反悔 | 删 Release → 删远端 tag → 删本地 tag |
@@ -66,10 +74,12 @@ description: Use when shipping a versioned release with git tag, CHANGELOG, and 
 | "小版本不用回滚预案" | 无预案即出事时无手段；预案是 push 前 1 分钟确认的三行字，不是文档工程 |
 | "Release body 用 git log 拼一下就行" | git log 是噪音不是发布说明；下游只认 CHANGELOG，拼 log 属违规分发 |
 | "复用旧 tag 省事" | tag 不可变，复用即污染历史；一律发 patch 版 |
+| "monorepo 也要求三处一致" | 先识别版本来源；多产物各有版本，不为凑一致改产物版本号 |
 
 ## Red Flags — STOP
 
-- CHANGELOG 顶部版本 ≠ tag 版本 ≠ 包版本
+- 单一版本源仓 CHANGELOG 顶部版本 ≠ tag 版本 ≠ 包版本
+- 未识别版本单一来源就默认套用三处一致（monorepo 强行统一）
 - Release body 来自 `git log` 而非 CHANGELOG 小节
 - tag 已 push 但无回滚路径（删 Release/删 tag/下游回退任一缺失）
 - 批量同步目标未确认即 push tag
@@ -79,7 +89,7 @@ description: Use when shipping a versioned release with git tag, CHANGELOG, and 
 
 ## Verification
 
-- [ ] `tag == CHANGELOG == 包版本` 三处一致，有证据（命令输出）
+- [ ] 版本单一来源已识别；单一版本源仓 `tag == CHANGELOG == 包版本` 三处一致，有证据（命令输出）
 - [ ] CHANGELOG 版本小节存在且非空
 - [ ] 本地构建产物版本号与 tag 一致
 - [ ] 门禁测试全绿
