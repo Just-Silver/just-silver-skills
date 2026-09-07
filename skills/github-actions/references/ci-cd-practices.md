@@ -196,7 +196,7 @@ CI 全绿（lint/type/test/build/audit）
 ③ 更新 CHANGELOG  ★ 发版的输入：Unreleased → [x.y.z] - 日期，见 changelog-conventions.md
    │
    ▼
-④ 一致性校验      tag 版本 == CHANGELOG 版本 == 包清单版本
+④ 一致性校验      tag 版本 == CHANGELOG 版本 == 包清单版本（单一版本源仓；monorepo/多制品按各自版本源）
    │
    ▼
 ⑤ 打 tag + 发版    git tag v1.2.3；构建产物 + 校验和；发布制品库 / GitHub Releases
@@ -296,7 +296,7 @@ on:
 - **CHANGELOG 是发版的输入，不是输出**：`## [Unreleased]` 区块随开发持续累积，发版时把它整理成 `## [x.y.z] - 日期` 小节。CHANGELOG 驱动发布内容，而非发布后才补。
 - **Keep a Changelog**：`Added` / `Changed` / `Deprecated` / `Removed` / `Fixed` / `Security` 六类分组；**至少**列出 deprecations / removals / breaking changes；日期用 ISO `YYYY-MM-DD`；绝不用 git 日志堆砌。
 - **Conventional Commits**：`feat` → MINOR、`fix` → PATCH、`BREAKING CHANGE` / `!` → MAJOR。提交规范是自动生成 CHANGELOG 与自动推导版本的前提。
-- **版本一致性（发版硬性卡点）**：`git tag` 版本 == CHANGELOG 顶部版本 == 包清单版本（`package.json` / `*.csproj` 等），三处必须一致。建议进 CD 流水线做检查步骤，不一致即失败。
+- **版本一致性（发版硬性卡点）**：`git tag` 版本 == CHANGELOG 顶部版本 == 包清单版本（`package.json` / `*.csproj` 等），三处必须一致——**适用于单一版本源仓**。建议进 CD 流水线做检查步骤，不一致即失败。**monorepo / 多制品仓**没有单一"包版本"可对：先识别各产物版本来源，按各自"CHANGELOG 小节 ↔ 版本源"校验，不强行统一（详见 shipping-and-launch）。
 
 ### Gitea CD 可照抄模板（CHANGELOG 驱动）
 
@@ -325,7 +325,7 @@ on:
 - **生产 secrets 进 CI / 写进仓库** → CI 与生产 secret 必须分层
 - **没有手动发布通道**（只能靠 push 触发部署）→ 生产部署无法控制时机；加 workflow_dispatch
 - **生产部署无保护** → GitHub 用 environment 保护规则；Gitea 用分支保护 + 手动触发
-- **发版不看 CHANGELOG / 版本一致性** → tag、CHANGELOG、包版本三处不一致，产物与记录脱节；发版前整理 Unreleased 并核对一致性（见 changelog-conventions.md）
+- **发版不看 CHANGELOG / 版本一致性** → tag、CHANGELOG、包版本三处不一致（单一版本源仓），产物与记录脱节；发版前整理 Unreleased 并核对一致性（见 changelog-conventions.md）
 - **CD 用 `git log` 拼 Release body 而非 CHANGELOG 该小节** → 违反 `changelog-conventions.md` 糟糕实践；Release 必须引用 CHANGELOG，`git log` 堆砌是噪音
 - **无视 CI 优化** → 流水线 10 分钟+ 且无任何优化动作，每次迭代都在烧时间
 - **把"能跑"当"设计对了"** → 语法正确只是底线；门禁完整、失败能反馈、发布可回退才是目标
@@ -349,6 +349,6 @@ on:
 - [ ] 最小 `permissions`；secrets 分层（CI 无生产凭据）
 - [ ] CI 失败会有人（人或 Agent）收到并修复，不靠 rerun 掩盖
 - [ ] 生产部署有手动/受控通道 + 保护（environment 或分支保护）
-- [ ] 发版流程含 CHANGELOG：Unreleased → 版本小节；tag/CHANGELOG/包版本三处一致（详见 changelog-conventions.md 落地清单）
+- [ ] 发版流程含 CHANGELOG：Unreleased → 版本小节；单一版本源仓 tag/CHANGELOG/包版本三处一致（详见 changelog-conventions.md 落地清单）
 - [ ] 流水线 ~10 分钟内；超时已做缓存 / 并行 / 路径过滤
 - [ ] `actionlint` 校验通过（用法见 SKILL.md「校验方法」）

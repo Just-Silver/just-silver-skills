@@ -1,14 +1,14 @@
 # Gitea Actions 差异要点（相对 GitHub Actions）
 
-> 官方源：https://docs.gitea.com/usage/actions/（comparison / faq / quickstart / design 页面）
+> 官方源：https://docs.gitea.com/usage/actions/（comparison / faq / quickstart / design 页面；页面右上角可切换目标版本）
 > 本文件是同一技能内 GitHub references 的 **Gitea 补充差异文件**；GitHub 侧语法详见同目录其余文件。
-> **维护模式**：Agent 无需也不应访问官方文档核验版本差异；实例升级后的文档更新由维护者负责。
-> **版本声明**：语法能力随版本演进（1.27 仅 `always()`，1.28+ 起支持标准 GitHub 函数），默认按"当前默认版本"（1.27）编写；能力明细见下文"版本演进表"与"版本策略"。
+> **定位**：本文件是维护者提炼的**常见差异速查，不是版本能力的最终权威**；与目标实例版本对应的官方文档冲突时**以官方文档为准**。语法/权限存疑应核对 docs.gitea.com 对应版本文档，**不禁止 Agent 查证**。
+> **版本声明**：语法能力随版本演进（1.27 仅 `always()`，1.28+ 起支持标准 GitHub 函数）；版本未知时默认按"当前默认版本"（1.27）**保守**编写，能力明细见下文"版本演进表"与"版本策略"。
 
 ## 第一步：确认目标平台（硬性）
 
 - **GitHub** → 用本目录 GitHub references（workflow-syntax / events / expressions / contexts）
-- **Gitea** → 本文件 **必读**；语法按"版本策略"小节处理：**默认按"当前默认版本"（1.27）编写，无需访问官方文档**；用户要求高版本特性（如 1.28 表达式函数）时向用户确认版本，按本文件版本演进表编写
+- **Gitea** → 本文件 **必读**；语法按"版本策略"小节处理：版本未知时**默认按"当前默认版本"（1.27）保守编写**；用户要求高版本特性（如 1.28 表达式函数）或语法存疑时，先确认实例版本，再按对应版本文档/演进表判定
 - 两平台语法重叠度约 95%，大多数 workflow 骨架可直接互相迁移；差异集中在本文列出的点上
 
 ## 基本事实与文件位置
@@ -43,7 +43,7 @@
 | `jobs.<job_id>.environment`（部署环境） | **忽略** | 用 `if` + 手动映射环境名 |
 | 复杂 `runs-on`（`runs-on: {group:, labels:}` 形式） | 始终不支持 | 1.27 仅静态/标签数组；1.28+ 支持表达式形式（见版本演进表） |
 | 表达式**函数**（1.27 版） | 官方文档：仅 `always()` 受支持（限制针对**函数**） | `==`/`!=`/`&&`/`\|\|`/`!` 运算符、上下文插值（`${{ gitea.ref }}`）、字符串/布尔字面量均**可用**（官方 FAQ 与 quickstart 示例证实），勿因函数限制过度规避全部 `${{ }}`；分支/标签判断优先事件过滤（`tags: ['v*']`）；1.28+ 已支持标准函数（见下文） |
-| `permissions` 的 GitHub 专属 scope | 不支持 `statuses` / `checks` / `deployments` / `id-token` / `security-events` / `pages` | 用 Gitea 专属 scope：`code` / `releases` / `wiki` / `projects`；其余（`contents` 等）通用 |
+| `permissions` 的 GitHub 专属 scope | 不支持 `statuses` / `checks` / `deployments` / `id-token` / `security-events` / `pages`（官方兼容说明列出） | 支持 scope 以官方 token-permissions 文档为准：`contents`（作用于 `code` + `releases`）/ `code` / `releases` / `issues` / `pull-requests` / `actions` / `wiki` / `projects` / `packages`；`contents` 与细粒度 scope（如 `code`/`releases`）同给时**细粒度覆盖**；Gitea 专属（GitHub 无独立 scope）：`code` / `releases` / `wiki` / `projects` |
 | Problem Matchers、错误注解 workflow 命令 | 忽略 | 无替代（不影响执行） |
 | `GITEA_TOKEN` 发布到包仓库 | 未实现 | 使用 PAT |
 
@@ -93,7 +93,7 @@
 ## Gitea Release 发布（零硬编码，可直接照抄）
 
 > 禁止硬编码 `http://server:3500` / 固定 `owner/repo`（如 `Yin/opencode-gitea`）。实例地址与仓库名必须由上下文动态获取，否则换实例/换仓库即失效。
-> **CHANGELOG 驱动（强制）**：禁止用 `git log PREV_TAG..HEAD` 直拼 Release body 冒充 CHANGELOG（见 `changelog-conventions.md`「糟糕实践」）；`CHANGELOG 是发版的输入`（`ci-cd-practices.md` 标准 CD 全流程 ③），CD 必须从 `CHANGELOG.md` 该版本小节提取。示例仓库需先有 `CHANGELOG.md`（含 `## [Unreleased]`，发版前整理为 `## [x.y.z] - YYYY-MM-DD`）——版本一致性 `tag == CHANGELOG == 包清单版本` 进流水线，不一致即失败（见 `changelog-conventions.md` 一致性卡点）。
+> **CHANGELOG 驱动（强制）**：禁止用 `git log PREV_TAG..HEAD` 直拼 Release body 冒充 CHANGELOG（见 `changelog-conventions.md`「糟糕实践」）；`CHANGELOG 是发版的输入`（`ci-cd-practices.md` 标准 CD 全流程 ③），CD 必须从 `CHANGELOG.md` 该版本小节提取。示例仓库需先有 `CHANGELOG.md`（含 `## [Unreleased]`，发版前整理为 `## [x.y.z] - YYYY-MM-DD`）——版本一致性 `tag == CHANGELOG == 包清单版本` 进流水线，不一致即失败（见 `changelog-conventions.md` 一致性卡点；**单一版本源仓**前提，monorepo/多制品按各自版本源）。
 
 - **触发**：`on.push.tags: ['v*']`（打 tag 发版）；`workflow_dispatch` 触发时跳过一致性校验（人工已 gate）
 - **`permissions.contents: write`** 足够（兼容 Gitea `releases: write`）
@@ -157,33 +157,40 @@
 
 ## 语法支持随版本演进（默认按当前默认版本 1.27 编写，见"版本策略"）
 
-| 能力 | 1.27（当前主流稳定版） | 1.28+（next 文档） |
+> 能力表为维护者提炼，**以目标版本官方文档为准**（docs.gitea.com 右上角可切 1.27.x / 1.28-dev 等版本对照）。
+
+| 能力 | 1.27（当前主流稳定版） | 1.28+（next/dev 文档） |
 |------|----------------------|--------------------|
 | 表达式函数 | 仅 `always()` 受支持（官方 comparison 原文） | 支持标准 GitHub 函数（`success()` / `failure()` / `always()` / `cancelled()` / `format()` / `toJSON()`） |
 | `runs-on` | 仅静态字符串或标签数组 | 额外支持字符串表达式（`runs-on: ${{ 条件 && 'ubuntu-latest' \|\| 'self-hosted' }}`）与含表达式的数组（`[linux, "${{ ... }}"]`）；`{group:, labels:}` 形式仍不支持 |
 | 表达式运算符/插值 | 可用（`==`、`&&`、`${{ gitea.ref }}`） | 可用 |
 
-### 版本策略（默认按 1.27 编写）
+### 版本策略（版本未知时按 1.27 保守编写）
 
-> **当前默认版本：1.27**（维护者升级 Gitea 实例后更新此标记，如改为 1.28）
+> **当前默认版本：1.27**（本仓维护者升级 Gitea 实例后更新此标记，如改为 1.28）
 
-**【默认】按"当前默认版本"（1.27）的语法编写，无需任何探测、无需出网**：
+**【默认】版本未知时，按"当前默认版本"（1.27）的语法保守编写**（不臆造高版本特性）：
 
 - 不用表达式函数（1.27 官方文档仅 `always()`）、不用 `environment`、不用复杂/表达式 runs-on
 - 用事件过滤（`tags: ['v*']`）、`==`/`&&`/`!` 运算符、上下文插值（`${{ gitea.ref }}`）、单 label 或静态字符串 `runs-on`、`contents: read`
 - 1.27 写法在 1.28+ 上完全兼容（1.28 是能力超集），实例升级后存量 workflow 无需改动
 
-**【目标版本 ≠ 默认版本】仅当用户明确要求高版本特性（如 1.28 表达式函数）时**才有必要确认真实版本——**版本事实必须来自用户/维护者**：
+**【目标版本 ≠ 默认版本】仅当用户明确要求高版本特性（如 1.28 表达式函数），或语法存疑时**才需要确认真实版本：
 
-- 用户没说版本 → **直接询问用户**（一条消息成本最低），**不得自行探测、不得访问官方文档核验、不得臆造**
-- 用户/维护者告知或确认版本后 → 对照版本演进表判定可用语法（例：1.27.x → 表达式函数仅 `always()`；1.28.x → 标准函数可用）
-- 用户无法确认版本 → 按"当前默认版本"（1.27）编写并告知限制
+- 已知目标实例版本 → 按该版本能力编写
+- 目标版本未知 → **直接询问用户/维护者**（一条消息成本最低，且不臆造）；无法确认 → 按"当前默认版本"（1.27）保守编写并**告知用户限制**
+- **版本能力存疑 / 与本文冲突 → 以目标版本官方文档为准**（docs.gitea.com 右上角可切版本），本文件只是速查、不是最终权威；不禁止查证
 
-### 语法兼容性取决于实例版本，而非 runner 版本（官方文档确认）
+> **为何以官方文档为最终权威**：本文由维护者提炼，可能滞后于上游发版。禁止 Agent 查证并不会让 Skill 更可靠，只会让它越用越旧——冲突时信官方、不信本文件。
+
+### 语法兼容性取决于实例版本，而非 runner 版本
 
 - Gitea 实例负责**解析 workflow、求值表达式、展开 matrix/runs-on、调度 job**——runner 拉取的是解析后的任务而非 YAML 文件。因此"哪些语法可用"（键、事件、表达式函数、runs-on 形式、permissions scope）**只取决于实例版本**（1.27 仅 `always()`、1.28 起集成 actionlint 求值，均为实例侧能力）
 - Gitea Runner 与实例**独立发版**，只负责执行层（容器/宿主机步骤、action 下载、日志流）——语法兼容性只看实例版本，不看 runner
-- 实践：语法支持与否 → 看目标实例版本（由用户/维护者确认）；action 能否执行（如 v7 系列要求 Node 24 运行时）→ 看 runner 与镜像版本
+- **这是两个维度，不要混为一谈**：
+  - workflow YAML / 表达式能否解析 → 看 **Gitea Server 实例版本**
+  - job 能否执行 / action（如 v7 系列要求 Node 24 运行时）能否跑 → 看 **Runner 与运行镜像**
+- 实例版本来源：已知则直接用；未知问维护者（不臆造）；语法存疑以对应版本文档为准
 
 ## actionlint 校验（GitHub 与 Gitea 均可用）
 
@@ -211,9 +218,9 @@ actionlint -ignore='the runner of "actions/upload-artifact@v3(\.[0-9]+\.[0-9]+)?
 
 1. 目录改为 `.gitea/workflows/`（确认仓库已启用 Actions）
 2. 删除 `jobs.*.environment`（被忽略）
-3. `runs-on` 保持单标签/标签列表形式
-4. 表达式函数一律不用（默认 1.27）；仅用户确认实例为 1.28+ 且要求时按版本表启用
-5. `permissions` 移除 GitHub 专属 scope（statuses/checks/deployments/id-token/security-events/pages）
+3. `runs-on` 保持单标签/标签列表形式（表达式形式需 1.28+）
+4. 表达式函数按版本策略：版本未知默认不用（仅 `always()`）；用户确认 1.28+ 且要求时按演进表启用
+5. `permissions` 移除 GitHub 专属 scope（statuses/checks/deployments/id-token/security-events/pages），改用 Gitea 支持 scope（见官方 token-permissions 文档）
 6. `GITHUB_TOKEN` 相关操作改用 `GITEA_TOKEN`（**须 `env: GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}` 显式注入，不裸注入**；包发布未实现需 PAT）
 7. PR 分支判断依赖 `ref == refs/heads/main` 的写法在 Gitea 天然成立，无需改
 8. 内网实例：核对 action 下载源（DEFAULT_ACTIONS_URL / 绝对 URL / 镜像）

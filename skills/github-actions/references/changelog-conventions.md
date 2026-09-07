@@ -143,7 +143,7 @@ tag 版本号 == CHANGELOG 中该版本号（一致性）        ← 流水线�
 
 ### 一致性卡点（强烈建议进 CD 流水线）
 
-发版时**版本号必须三处一致**：`git tag` / CHANGELOG 顶部版本 / 包管理器版本（`package.json` / `*.csproj` 等）。可在 workflow 里加检查步骤，不一致则失败：
+发版时**版本号必须三处一致**（适用于**单一版本源仓**：一个 repo 只发布一个版本化产物）：`git tag` / CHANGELOG 顶部版本 / 包管理器版本（`package.json` / `*.csproj` 等）。可在 workflow 里加检查步骤，不一致则失败。**monorepo / 多制品仓**（多 package、或 Docker 镜像 / NuGet / npm 混出）没有单一"包版本"可对——先识别各产物版本来源，按各自"CHANGELOG 小节 ↔ 版本源"校验，**不得为凑三处一致去改产物版本号**：
 
 ```yaml
 # 伪代码骨架：tag 触发时校验版本一致（具体按 ci-cd-practices.md + workflow-syntax.md 落实）
@@ -180,7 +180,7 @@ tag 版本号 == CHANGELOG 中该版本号（一致性）        ← 流水线�
 - **用 git 日志当 CHANGELOG** → 噪音大，不是给人读的；见上「糟糕实践」
 - **CHANGELOG 不一致**（只记部分重要变更）→ 用户会误以为 CHANGELOG 是唯一事实源；要么全记要么不记
 - **breaking change 不标** → 破坏性变更淹没在日志里，升级用户踩坑；必须列出 deprecations / removals / breaking
-- **版本号三处不一致**（tag / CHANGELOG / 包版本）→ 发布后对不上，产物与记录脱节；进流水线强制校验
+- **版本号三处不一致**（tag / CHANGELOG / 包版本，**单一版本源仓**）→ 发布后对不上，产物与记录脱节；进流水线强制校验（monorepo/多制品先识别各自版本源，勿强行统一）
 - **想靠工具自动生成但提交乱写** → 工具输出垃圾；先立 Conventional Commits + Unreleased 纪律，再自动化
 - **日期格式混乱** → 一律 ISO `YYYY-MM-DD`
 - **发版前才补 CHANGELOG** → 变更早忘了；随手在 Unreleased 记录，发版只是移动整理
@@ -190,6 +190,6 @@ tag 版本号 == CHANGELOG 中该版本号（一致性）        ← 流水线�
 - [ ] 项目有 `CHANGELOG.md`，顶部有 `## [Unreleased]` 区块，声明遵循 Keep a Changelog 与 SemVer
 - [ ] 提交遵循 Conventional Commits（或至少有固定类型）；`feat` / `fix` / `BREAKING CHANGE` 分类正确
 - [ ] 版本决策清楚：MAJOR / MINOR / PATCH 对应关系明确（0.x 阶段特例已约定）
-- [ ] 发版时 tag 版本 == CHANGELOG 该版本 == 包清单版本（三处一致，最好进 CI/CD 强制）
+- [ ] 发版时 tag 版本 == CHANGELOG 该版本 == 包清单版本（**单一版本源仓**三处一致，最好进 CI/CD 强制；monorepo/多制品按各自版本源校验）
 - [ ] CHANGELOG 至少列出 breaking / deprecations / removals；日期用 ISO
 - [ ] 明确"手动维护 vs 自动生成"取舍；若用工具，提交规范先立好
