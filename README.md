@@ -20,7 +20,6 @@ curl -fsSL https://raw.githubusercontent.com/Just-Silver/just-silver-skills/main
 |------|------|----------|
 | bootstrapblazor | Use when working with BootstrapBlazor (also called BB, bb, or bootstrapblazor) components and needing their... | [skills/bootstrapblazor/](skills/bootstrapblazor/) |
 | github-actions | Use when creating or editing GitHub Actions or Gitea Actions workflow YAML (.github/workflows/*.yml, .gitea... | [skills/github-actions/](skills/github-actions/) |
-| karpathy-guidelines | Behavioral guidelines to reduce common LLM coding mistakes. Use when writing, reviewing, or refactoring cod... | [skills/karpathy-guidelines/](skills/karpathy-guidelines/) |
 | sdlc / api-and-interface-design | Use when designing module boundaries or public interfaces, when defining error semantics, when adding field... | [skills/sdlc/api-and-interface-design/](skills/sdlc/api-and-interface-design/) |
 | sdlc / code-simplification | Use when code works but is harder to read or maintain than it should be, when reviewing for unnecessary com... | [skills/sdlc/code-simplification/](skills/sdlc/code-simplification/) |
 | sdlc / constraint-driven-development | Use when no quality bar is written down, when setting up constraints or defining standards, when an agent s... | [skills/sdlc/constraint-driven-development/](skills/sdlc/constraint-driven-development/) |
