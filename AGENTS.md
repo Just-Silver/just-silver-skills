@@ -48,6 +48,7 @@
 | `update-readme.yml` | push main 且 `paths: ['skills/**']`（或手动） | 跑脚本 → 只提交 `README.md` |
 | `update-actionlint.yml` | 每周一 03:00 UTC + 手动兜底（push 不触发） | 跑 `update-actionlint.ps1` 轮询最新 actionlint → 绿灯自动提交二进制+版本；红灯截停改开 PR；本地 exe 缺失强制重下（A1 自愈） |
 | `sync-obra-superpowers.yml` | 每周一 03:00 UTC + 手动 | thin caller，只填 inputs；调可复用模板 `sync-upstream-skills.yml`（`workflow_call`）→ 推 `sync/*` 分支开 PR，review 后手动合并 |
+| `sync-drawio-skill.yml` | 每周一 03:00 UTC + 手动 | thin caller，只填 inputs；调可复用模板 `sync-upstream-skills.yml`（`workflow_call`）→ 推 `sync/*` 分支开 PR，review 后手动合并 |
 
 路径注意：actionlint 脚本在 **技能目录** `skills/github-actions/scripts/update-actionlint.ps1`（不是仓库根 `scripts/`）——两处同名 `scripts/` 勿混。
 
