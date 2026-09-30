@@ -1,16 +1,16 @@
 # AGENTS.md — 仓库维护指引
 
-本仓库是一个**技能集仓库**：产物是 `skills/**/SKILL.md`，经 `scripts/install-skills.sh` 一键平铺安装到用户的通用 agent 技能目录（默认 `~/.agents/skills/`，每个技能一个一级子目录，可用 `JSS_SKILLS_DEST` 覆盖根目录）。本文件面向**在本仓库内改动的人或 Agent（维护者）**——它只在"你正在编辑这个仓库"时被加载；安装到用户侧后，技能逻辑全部由各 `SKILL.md` 承载，与本文件无关。
+本仓库是一个**技能集仓库**：产物是 `skills/**/SKILL.md`，经 `scripts/install-skills.sh` 一键安装到用户的全局技能目录（默认 `~/.config/opencode/skills/just-silver-skills/`，可用 `JSS_SKILLS_DEST` 覆盖）。本文件面向**在本仓库内改动的人或 Agent（维护者）**——它只在"你正在编辑这个仓库"时被加载；安装到用户侧后，技能逻辑全部由各 `SKILL.md` 承载，与本文件无关。
 
 交流用简体中文；git commit 信息用中文。
 
 ## 唯一数据源与产物边界
 
 - **技能 = `skills/**/SKILL.md`**，布局只分两类：
-  - **自建技能**：直接放 `skills/<name>/` 顶层（如 `bootstrapblazor`、`github-actions`）。不预套分组层；支持文件（`references/`、`scripts/`、`examples/`）放自己目录内，不散落仓库根。真需要隔离某批技能时再 `git mv` 成 `skills/<group>/<name>/`——安装侧只按 frontmatter `name` 平铺，与目录层级无关，所以改层级对用户侧零影响。
+  - **自建技能**：直接放 `skills/<name>/` 顶层（如 `bootstrapblazor`、`github-actions`）。不预套分组层；支持文件（`references/`、`scripts/`、`examples/`）放自己目录内，不散落仓库根。真需要隔离某批技能时再 `git mv` 成 `skills/<group>/<name>/`——安装侧整目录拷贝、技能 ID 取叶目录名，与目录层级无关，所以改层级对用户侧零影响。
   - **上游镜像**：整体放 `skills/<镜像名>/`（如 `obra-superpowers`），由 sync workflow 全量覆盖 → **禁止手动修改**（改了会被下次同步冲掉）；目录内 `.mirror` 标记使其自动排除出 README 自建技能表。
 - **`README.md` 是自动生成的产物**：技能表格由 `scripts/update-readme.ps1` 从各技能 frontmatter 生成（AUTO-GENERATED 注释块包裹），**不要手改表格**；块外的安装/卸载文案是手写区，可正常编辑。
-- **安装/卸载脚本**：`scripts/install-skills.sh` / `scripts/uninstall-skills.sh`，对外命令见 README 顶部。平铺安装：每个技能装成 `<技能根目录>/<frontmatter name>/`；归属靠清单 `.just-silver-skills.manifest` + 每个已装目录内的标记 `.jss-skill`，安装/卸载只动这两者认定的目录，不碰同级他人技能。
+- **安装/卸载脚本**：`scripts/install-skills.sh` / `scripts/uninstall-skills.sh`，对外命令见 README 顶部。整目录原子替换到全局 `skills/just-silver-skills/`（Windows 即 `%USERPROFILE%\.config\opencode\skills\just-silver-skills\`），安装/卸载只动这一个目录，不碰同级他人技能。
 
 ## 改动流程
 
@@ -43,15 +43,13 @@
 
 - **无耦合：改脚本不需要动 workflow**。4 个 workflow 都不引用 `scripts/*.sh`、也不做技能安装；`update-readme.yml` 的 `paths: ['skills/**']` 过滤使"只改 `scripts/` / `README.md` / `AGENTS.md`"的提交不触发任何 CI 运行——设计如此，别当漏配或回归。
 - **发布的脚本靠 push main 生效**：README 的 `curl` 从 `raw.githubusercontent.com/Just-Silver/just-silver-skills/main/scripts/*.sh` 取。这类提交不产生 CI 运行记录，**别用"CI 没跑过"判断脚本没生效**（对拉远端与本地字节是否一致即可验证）。
-- **脚本没有 CI 兜底**：仓库里唯一无人守门的产物就是这两个 sh（技能有 README 生成器、workflow 有 actionlint）。改完只能人工冒烟，用下面这套隔离冒烟（只动 `%TEMP%`，绝不碰真实 `~/.agents/skills`）：
+- **脚本没有 CI 兜底**：仓库里唯一无人守门的产物就是这两个 sh（技能有 README 生成器、workflow 有 actionlint）。改完只能人工冒烟，用下面这套隔离冒烟（只动 `%TEMP%`，绝不碰真实 `~/.config/opencode/skills/just-silver-skills`）：
   ```pwsh
-  $env:JSS_SKILLS_DEST = "$env:TEMP\jss-smoke\skills"
-  $env:JSS_LEGACY_SKILLS_DEST = "$env:TEMP\jss-smoke\legacy\just-silver-skills"
+  $env:JSS_SKILLS_DEST = "$env:TEMP\jss-smoke\skills\just-silver-skills"
   curl -fsSL https://raw.githubusercontent.com/Just-Silver/just-silver-skills/main/scripts/install-skills.sh | bash
   curl -fsSL https://raw.githubusercontent.com/Just-Silver/just-silver-skills/main/scripts/uninstall-skills.sh | bash
   ```
-  验收点：陌生同名目录被拒（exit 1 且不覆盖）、干净根目录装→卸后只剩他人技能、仓库删掉的技能下次安装自动清理。
-- **重名会整体拒装**：安装按 frontmatter `name` 平铺，重名即 `exit 1`（不部分安装）。新增技能/镜像后跑一次上面的隔离安装即可发现，不必手数。
+  验收点：干净目录装→卸后该目录消失、安装幂等可重跑（原子替换，失败回滚旧版）、同级他人技能目录不受影响。
 
 ## workflow 职责速查
 
