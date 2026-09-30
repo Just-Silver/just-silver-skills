@@ -1,6 +1,6 @@
 # AGENTS.md — 仓库维护指引
 
-本仓库是一个 **OpenCode 技能集仓库**：产物是 `skills/**/SKILL.md`，经 `scripts/install-skills.sh` 一键安装到用户的全局技能目录。本文件面向**在本仓库内改动的人或 Agent（维护者）**——它只在"你正在编辑这个仓库"时被加载；安装到用户侧后，技能逻辑全部由各 `SKILL.md` 承载，与本文件无关。
+本仓库是一个 **OpenCode 技能集仓库**：产物是 `skills/**/SKILL.md`，经 `scripts/install-skills.sh` 一键平铺安装到用户的通用 agent 技能目录（默认 `~/.agents/skills/`，每个技能一个一级子目录，可用 `JSS_SKILLS_DEST` 覆盖根目录）。本文件面向**在本仓库内改动的人或 Agent（维护者）**——它只在"你正在编辑这个仓库"时被加载；安装到用户侧后，技能逻辑全部由各 `SKILL.md` 承载，与本文件无关。
 
 交流用简体中文；git commit 信息用中文。
 
@@ -13,7 +13,7 @@
   - 配套支持文件（references/、scripts/、examples/ 等）放所属技能目录内，不散落仓库根
 - **`README.md` 是自动生成的产物**：技能表格由 `scripts/update-readme.ps1` 从各技能 frontmatter 生成（AUTO-GENERATED 注释块包裹），**不要手改表格**。
 - **`skills/obra-superpowers/` 是上游镜像**：由 sync workflow 全量覆盖，**禁止手动修改**（改了会被下次同步冲掉）。目录内 `.mirror` 标记使其自动排除出 README 自建技能表。
-- **安装/卸载脚本**：`scripts/install-skills.sh` / `scripts/uninstall-skills.sh`，对外命令见 README 顶部。
+- **安装/卸载脚本**：`scripts/install-skills.sh` / `scripts/uninstall-skills.sh`，对外命令见 README 顶部。平铺安装：每个技能装成 `<技能根目录>/<frontmatter name>/`，根目录默认 `~/.agents/skills`；归属靠清单 `.just-silver-skills.manifest` + 每个已装目录内的标记 `.jss-skill`，安装/卸载只动这两者认定的目录，不碰同级他人技能。
 
 ## 改动流程
 
