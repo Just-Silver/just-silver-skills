@@ -7,7 +7,7 @@
 ## 唯一数据源与产物边界
 
 - **技能 = `skills/**/SKILL.md`**：技能按**主题归类**——
-  - 规范/流程类技能（SDLC 族：增量实现、安全、发版、质疑驱动……）→ `skills/sdlc/<name>/`
+  - 规范/流程类技能（SDLC 族：安全、发版、文档/ADR、可观测性……）→ `skills/sdlc/<name>/`
   - 独立主题技能（技术栈、行为准则、CI/CD……）→ 直接放 `skills/<name>/` 顶层
   - 不以"单文件还是多文件"判别：单文件技能可直接放顶层，扩出 `references/` / `scripts/` 等支持文件也都在自己目录内；同主题真攒到多个技能时再 `git mv` 成 `skills/<group>/<name>/`（成本低、可逆）
   - 配套支持文件（references/、scripts/、examples/ 等）放所属技能目录内，不散落仓库根
@@ -53,7 +53,7 @@
   curl -fsSL https://raw.githubusercontent.com/Just-Silver/just-silver-skills/main/scripts/install-skills.sh | bash
   curl -fsSL https://raw.githubusercontent.com/Just-Silver/just-silver-skills/main/scripts/uninstall-skills.sh | bash
   ```
-- **新增上游镜像合并前先查技能名重名**：安装按 frontmatter `name` 平铺，重名会 `exit 1` **整体拒装**（不部分安装）；当前 27 个技能名无重复。
+- **新增上游镜像合并前先查技能名重名**：安装按 frontmatter `name` 平铺，重名会 `exit 1` **整体拒装**（不部分安装）。方法：本地跑一次隔离安装（上面的命令）即可发现重名，不必逐个手数；删除/改名技能不会留下孤儿目录——下次安装按清单自动清理。
 
 ## workflow 职责速查
 
