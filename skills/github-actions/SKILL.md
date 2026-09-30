@@ -28,7 +28,7 @@ GitHub Actions 与 Gitea Actions 约 95% 语法通用（后者兼容前者）。
 | `github` / `secrets` / `needs` 等上下文 | `references/contexts.md` |
 | **Gitea 目标必读**：目录、token、权限、版本差异 | `references/gitea-differences.md` |
 | 质量门禁、CI 优化、部署策略 | `references/ci-cd-practices.md` |
-| CD/发版/Release（含 `push.tags` / `releases` API / `cd.yml`） | `references/ci-cd-practices.md` + `references/changelog-conventions.md` 必读（CHANGELOG 是输入，Release 引用它；**单一版本源仓** `tag==CHANGELOG==包版本` 一致性进流水线；monorepo/多制品仓先识别各自版本源，不强行统一——见 shipping-and-launch） |
+| CD/发版/Release（含 `push.tags` / `releases` API / `cd.yml`） | `references/ci-cd-practices.md` + `references/changelog-conventions.md` 必读（CHANGELOG 是输入，Release 引用它；**单一版本源仓** `tag==CHANGELOG==包版本` 一致性进流水线；monorepo/多制品仓先识别各自版本源，不强行统一） |
 
 > 凡文件含 `push.tags`、`releases` API、`CHANGELOG` 或任务含“发版/CD/Release”，必须走此分支；绕过即违规，`gitea-differences.md` 的 `git log` 演示不得覆盖本分支。
 

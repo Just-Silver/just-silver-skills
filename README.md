@@ -20,13 +20,5 @@ curl -fsSL https://raw.githubusercontent.com/Just-Silver/just-silver-skills/main
 |------|------|----------|
 | bootstrapblazor | Use when working with BootstrapBlazor (also called BB, bb, or bootstrapblazor) components and needing their... | [skills/bootstrapblazor/](skills/bootstrapblazor/) |
 | github-actions | Use when creating or editing GitHub Actions or Gitea Actions workflow YAML (.github/workflows/*.yml, .gitea... | [skills/github-actions/](skills/github-actions/) |
-| sdlc / api-and-interface-design | Use when designing module boundaries or public interfaces, when defining error semantics, when adding field... | [skills/sdlc/api-and-interface-design/](skills/sdlc/api-and-interface-design/) |
-| sdlc / code-simplification | Use when code works but is harder to read or maintain than it should be, when reviewing for unnecessary com... | [skills/sdlc/code-simplification/](skills/sdlc/code-simplification/) |
-| sdlc / constraint-driven-development | Use when no quality bar is written down, when setting up constraints or defining standards, when an agent s... | [skills/sdlc/constraint-driven-development/](skills/sdlc/constraint-driven-development/) |
-| sdlc / deprecation-and-migration | Use when removing an old API, feature, or distribution channel, when renaming a public function with downst... | [skills/sdlc/deprecation-and-migration/](skills/sdlc/deprecation-and-migration/) |
-| sdlc / documentation-and-adrs | Use when making an architectural decision with alternatives, when asked why something is the way it is and ... | [skills/sdlc/documentation-and-adrs/](skills/sdlc/documentation-and-adrs/) |
-| sdlc / observability-and-instrumentation | Use when adding logging, metrics, tracing, or alerting, when shipping a feature that runs in production, or... | [skills/sdlc/observability-and-instrumentation/](skills/sdlc/observability-and-instrumentation/) |
-| sdlc / security-and-hardening | Use when handling user input, secrets, tokens, or file paths, when building auth or external integrations, ... | [skills/sdlc/security-and-hardening/](skills/sdlc/security-and-hardening/) |
-| sdlc / shipping-and-launch | Use when shipping a versioned release with git tag, CHANGELOG, and Release, before pushing tag or publishin... | [skills/sdlc/shipping-and-launch/](skills/sdlc/shipping-and-launch/) |
 
 <!-- /AUTO-GENERATED -->

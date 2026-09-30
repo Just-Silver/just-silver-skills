@@ -1,34 +1,31 @@
 # AGENTS.md — 仓库维护指引
 
-本仓库是一个 **OpenCode 技能集仓库**：产物是 `skills/**/SKILL.md`，经 `scripts/install-skills.sh` 一键平铺安装到用户的通用 agent 技能目录（默认 `~/.agents/skills/`，每个技能一个一级子目录，可用 `JSS_SKILLS_DEST` 覆盖根目录）。本文件面向**在本仓库内改动的人或 Agent（维护者）**——它只在"你正在编辑这个仓库"时被加载；安装到用户侧后，技能逻辑全部由各 `SKILL.md` 承载，与本文件无关。
+本仓库是一个**技能集仓库**：产物是 `skills/**/SKILL.md`，经 `scripts/install-skills.sh` 一键平铺安装到用户的通用 agent 技能目录（默认 `~/.agents/skills/`，每个技能一个一级子目录，可用 `JSS_SKILLS_DEST` 覆盖根目录）。本文件面向**在本仓库内改动的人或 Agent（维护者）**——它只在"你正在编辑这个仓库"时被加载；安装到用户侧后，技能逻辑全部由各 `SKILL.md` 承载，与本文件无关。
 
 交流用简体中文；git commit 信息用中文。
 
 ## 唯一数据源与产物边界
 
-- **技能 = `skills/**/SKILL.md`**：技能按**主题归类**——
-  - 规范/流程类技能（SDLC 族：安全、发版、文档/ADR、可观测性……）→ `skills/sdlc/<name>/`
-  - 独立主题技能（技术栈、行为准则、CI/CD……）→ 直接放 `skills/<name>/` 顶层
-  - 不以"单文件还是多文件"判别：单文件技能可直接放顶层，扩出 `references/` / `scripts/` 等支持文件也都在自己目录内；同主题真攒到多个技能时再 `git mv` 成 `skills/<group>/<name>/`（成本低、可逆）
-  - 配套支持文件（references/、scripts/、examples/ 等）放所属技能目录内，不散落仓库根
-- **`README.md` 是自动生成的产物**：技能表格由 `scripts/update-readme.ps1` 从各技能 frontmatter 生成（AUTO-GENERATED 注释块包裹），**不要手改表格**。
-- **`skills/obra-superpowers/` 是上游镜像**：由 sync workflow 全量覆盖，**禁止手动修改**（改了会被下次同步冲掉）。目录内 `.mirror` 标记使其自动排除出 README 自建技能表。
-- **安装/卸载脚本**：`scripts/install-skills.sh` / `scripts/uninstall-skills.sh`，对外命令见 README 顶部。平铺安装：每个技能装成 `<技能根目录>/<frontmatter name>/`，根目录默认 `~/.agents/skills`；归属靠清单 `.just-silver-skills.manifest` + 每个已装目录内的标记 `.jss-skill`，安装/卸载只动这两者认定的目录，不碰同级他人技能。
+- **技能 = `skills/**/SKILL.md`**，布局只分两类：
+  - **自建技能**：直接放 `skills/<name>/` 顶层（如 `bootstrapblazor`、`github-actions`）。不预套分组层；支持文件（`references/`、`scripts/`、`examples/`）放自己目录内，不散落仓库根。真需要隔离某批技能时再 `git mv` 成 `skills/<group>/<name>/`——安装侧只按 frontmatter `name` 平铺，与目录层级无关，所以改层级对用户侧零影响。
+  - **上游镜像**：整体放 `skills/<镜像名>/`（如 `obra-superpowers`），由 sync workflow 全量覆盖 → **禁止手动修改**（改了会被下次同步冲掉）；目录内 `.mirror` 标记使其自动排除出 README 自建技能表。
+- **`README.md` 是自动生成的产物**：技能表格由 `scripts/update-readme.ps1` 从各技能 frontmatter 生成（AUTO-GENERATED 注释块包裹），**不要手改表格**；块外的安装/卸载文案是手写区，可正常编辑。
+- **安装/卸载脚本**：`scripts/install-skills.sh` / `scripts/uninstall-skills.sh`，对外命令见 README 顶部。平铺安装：每个技能装成 `<技能根目录>/<frontmatter name>/`；归属靠清单 `.just-silver-skills.manifest` + 每个已装目录内的标记 `.jss-skill`，安装/卸载只动这两者认定的目录，不碰同级他人技能。
 
 ## 改动流程
 
-### 新增 / 修改一个技能
+### 新增 / 修改 / 删除一个技能
 
-1. 只改 `SKILL.md`（含 frontmatter `name` + `description`；`description` 会被截断至 110 字符并转义 `|` 作为 README 表格"介绍"列——写清楚触发场景）
+1. 改 `SKILL.md`（含 frontmatter `name` + `description`；`description` 会被截断至 110 字符并转义 `|` 作为 README 表格"介绍"列）
 2. 跑 `pwsh ./scripts/update-readme.ps1`（幂等：连续两次字节不变；CI 也会自动跑，但本地先验证）
-3. `git diff --exit-code README.md` 确认无多余改动
-4. 提交；push 后 CI 的 `update-readme` 会再兜底一次
-
-> 新建技能按**主题归类**：规范/流程类进 `skills/sdlc/<name>/`；独立主题（技术栈 / 行为准则 / CI/CD 等）直接放 `skills/<name>/` 顶层，不必为"将来可能扩展"预套分组层——技能在自己目录内即可扩展，同主题攒到多个再成组。
+3. `git diff --exit-code README.md` 确认无多余改动——生成器写 LF、checkout 出 CRLF，本地跑完 `git status` 可能残留"格式脏"，`git checkout -- README.md` 即可
+4. 删除技能后**顺手清悬空引用**：搜技能名，把别处"详见 xxx"这类手写指向一并改掉（README 表格会自动收敛，手写引用不会）
+5. 提交；push 后 CI 的 `update-readme` 再兜底一次。删除/改名**不需要用户手动卸载**：下次安装按清单自动清理其目录
 
 ### 技能内容约束
 
 - 每个技能必须有 frontmatter（name + description）+ 明确行为指令（When to Use / 禁止事项 / 触发边界）
+- **`description` 是唯一触发入口，必须写硬触发词**（"before writing implementation code"、"when a build fails" 这类可判定场景）；"风险高时""值得的时候""任何多文件改动"这类软判断在 catalog 竞争里打不过硬触发技能，等于没装——本仓库 2026-09-30 因此整体删除了 sdlc 技能组
 - 行为规则写成"默认 + 例外"，避免把个人习惯写成无条件的绝对律令；触发靠 `description` + `When NOT to use` 让模型自行判断，不建硬路由矩阵
 - 示例：bootstrapblazor 禁止臆造组件 API，必须 `bb-llms --help` 验证可用性后用 `get/search/list` 查官方文档；bb-llms 未装时只提示用户手动安装，**不得自行 dotnet tool install、不得臆造**
 
@@ -41,19 +38,19 @@
 - **新增/修改 schedule 类 workflow 后必须立即 `gh workflow run` 手动冒烟**，不得等调度窗口（路径 bug 曾潜伏到首次手动触发才暴露）。
 - **改 `scripts/install-skills.sh` / `uninstall-skills.sh` 必须在 PowerShell 宿主用 `curl ... | bash` 真实验证**（脚本内置 MSYS 路径修正，见脚本内注释）。
 
-### 安装/卸载脚本与 CI 的关系（2026-09-30 审计结论）
+### 安装/卸载脚本与 CI 的关系
 
-- **无耦合：改脚本不需要动 workflow**。4 个 workflow 都不引用 `scripts/*.sh`、也不做技能安装；`update-readme.yml` 的 `paths: ['skills/**']` 过滤使"只改 `scripts/` / `README.md` / `AGENTS.md`"的提交不触发任何 CI 运行——设计如此，别把它当漏配或回归。
-- **README 的安装/卸载段落是手写区**：它在 AUTO-GENERATED 块**外**，`update-readme.ps1` 只替换块内表格，实测跑完生成器 `git diff --exit-code README.md` 为 0 → CI 不会回退这段文案（但表格区仍禁手改）。注意生成器写 LF、checkout 出 CRLF，因此本地跑完 `git status` 可能残留"格式脏"，`git checkout -- README.md` 即可。
-- **发布的脚本靠 push main 生效**：README 的 `curl` 从 `raw.githubusercontent.com/Just-Silver/just-silver-skills/main/scripts/*.sh` 取，改动必须先推 main。这类提交不会产生 CI 运行记录，**别用"CI 没跑过"判断脚本没生效**（可对拉远端与本地字节是否一致来验证）。
-- **脚本没有 CI 兜底**：仓库里唯一无人守门的产物就是这两个 sh（技能有 README 生成器、workflow 有 actionlint）。改完只能人工冒烟，推荐下面这套隔离冒烟（只动 `%TEMP%`，绝不碰真实 `~/.agents/skills`）：先造一个陌生同名目录应被拒（exit 1）、再干净根目录装→卸应只剩他人技能、并验证"仓库删技能下次安装自动清理"。
+- **无耦合：改脚本不需要动 workflow**。4 个 workflow 都不引用 `scripts/*.sh`、也不做技能安装；`update-readme.yml` 的 `paths: ['skills/**']` 过滤使"只改 `scripts/` / `README.md` / `AGENTS.md`"的提交不触发任何 CI 运行——设计如此，别当漏配或回归。
+- **发布的脚本靠 push main 生效**：README 的 `curl` 从 `raw.githubusercontent.com/Just-Silver/just-silver-skills/main/scripts/*.sh` 取。这类提交不产生 CI 运行记录，**别用"CI 没跑过"判断脚本没生效**（对拉远端与本地字节是否一致即可验证）。
+- **脚本没有 CI 兜底**：仓库里唯一无人守门的产物就是这两个 sh（技能有 README 生成器、workflow 有 actionlint）。改完只能人工冒烟，用下面这套隔离冒烟（只动 `%TEMP%`，绝不碰真实 `~/.agents/skills`）：
   ```pwsh
   $env:JSS_SKILLS_DEST = "$env:TEMP\jss-smoke\skills"
   $env:JSS_LEGACY_SKILLS_DEST = "$env:TEMP\jss-smoke\legacy\just-silver-skills"
   curl -fsSL https://raw.githubusercontent.com/Just-Silver/just-silver-skills/main/scripts/install-skills.sh | bash
   curl -fsSL https://raw.githubusercontent.com/Just-Silver/just-silver-skills/main/scripts/uninstall-skills.sh | bash
   ```
-- **新增上游镜像合并前先查技能名重名**：安装按 frontmatter `name` 平铺，重名会 `exit 1` **整体拒装**（不部分安装）。方法：本地跑一次隔离安装（上面的命令）即可发现重名，不必逐个手数；删除/改名技能不会留下孤儿目录——下次安装按清单自动清理。
+  验收点：陌生同名目录被拒（exit 1 且不覆盖）、干净根目录装→卸后只剩他人技能、仓库删掉的技能下次安装自动清理。
+- **重名会整体拒装**：安装按 frontmatter `name` 平铺，重名即 `exit 1`（不部分安装）。新增技能/镜像后跑一次上面的隔离安装即可发现，不必手数。
 
 ## workflow 职责速查
 

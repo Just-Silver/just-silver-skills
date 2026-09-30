@@ -296,7 +296,7 @@ on:
 - **CHANGELOG 是发版的输入，不是输出**：`## [Unreleased]` 区块随开发持续累积，发版时把它整理成 `## [x.y.z] - 日期` 小节。CHANGELOG 驱动发布内容，而非发布后才补。
 - **Keep a Changelog**：`Added` / `Changed` / `Deprecated` / `Removed` / `Fixed` / `Security` 六类分组；**至少**列出 deprecations / removals / breaking changes；日期用 ISO `YYYY-MM-DD`；绝不用 git 日志堆砌。
 - **Conventional Commits**：`feat` → MINOR、`fix` → PATCH、`BREAKING CHANGE` / `!` → MAJOR。提交规范是自动生成 CHANGELOG 与自动推导版本的前提。
-- **版本一致性（发版硬性卡点）**：`git tag` 版本 == CHANGELOG 顶部版本 == 包清单版本（`package.json` / `*.csproj` 等），三处必须一致——**适用于单一版本源仓**。建议进 CD 流水线做检查步骤，不一致即失败。**monorepo / 多制品仓**没有单一"包版本"可对：先识别各产物版本来源，按各自"CHANGELOG 小节 ↔ 版本源"校验，不强行统一（详见 shipping-and-launch）。
+- **版本一致性（发版硬性卡点）**：`git tag` 版本 == CHANGELOG 顶部版本 == 包清单版本（`package.json` / `*.csproj` 等），三处必须一致——**适用于单一版本源仓**。建议进 CD 流水线做检查步骤，不一致即失败。**monorepo / 多制品仓**没有单一"包版本"可对：先识别各产物版本来源，按各自"CHANGELOG 小节 ↔ 版本源"校验，不强行统一。
 
 ### Gitea CD 可照抄模板（CHANGELOG 驱动）
 
