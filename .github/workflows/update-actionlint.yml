@@ -67,7 +67,9 @@ jobs:
           # 不触碰 .github/workflows/**；会触发 update-readme（paths: skills/**），
           # 而后者只提交 README.md（不在 skills/** 内）→ 递归终止。
           git add skills/github-actions/scripts/actionlint.exe skills/github-actions/scripts/actionlint.version
-          if (git diff --cached --quiet) {
+          # 同 update-readme：判空看输出，不能写 `if (git diff --cached --quiet)`（PowerShell 取 stdout，恒假）
+          $staged = git diff --cached --name-only
+          if ([string]::IsNullOrWhiteSpace($staged)) {
             Write-Output '校验器无更新，跳过提交'
           } else {
             git config user.name 'github-actions[bot]'

@@ -25,7 +25,10 @@ jobs:
         run: |
           if (Test-Path README.md) {
             git add README.md
-            if (git diff --cached --quiet) {
+            # 判空必须看 git 的输出：PowerShell 里 `if (git diff --cached --quiet)` 取的是命令 stdout，
+            # 为空恒假 → 永远走 else，把"无变化"误报成"已自动提交并推送"（详见 sync-upstream-skills.yml 同类注释）
+            $staged = git diff --cached --name-only
+            if ([string]::IsNullOrWhiteSpace($staged)) {
               Write-Output 'README 无变化，跳过提交'
             } else {
               git config user.name 'github-actions[bot]'
