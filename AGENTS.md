@@ -41,6 +41,20 @@
 - **新增/修改 schedule 类 workflow 后必须立即 `gh workflow run` 手动冒烟**，不得等调度窗口（路径 bug 曾潜伏到首次手动触发才暴露）。
 - **改 `scripts/install-skills.sh` / `uninstall-skills.sh` 必须在 PowerShell 宿主用 `curl ... | bash` 真实验证**（脚本内置 MSYS 路径修正，见脚本内注释）。
 
+### 安装/卸载脚本与 CI 的关系（2026-09-30 审计结论）
+
+- **无耦合：改脚本不需要动 workflow**。4 个 workflow 都不引用 `scripts/*.sh`、也不做技能安装；`update-readme.yml` 的 `paths: ['skills/**']` 过滤使"只改 `scripts/` / `README.md` / `AGENTS.md`"的提交不触发任何 CI 运行——设计如此，别把它当漏配或回归。
+- **README 的安装/卸载段落是手写区**：它在 AUTO-GENERATED 块**外**，`update-readme.ps1` 只替换块内表格，实测跑完生成器 `git diff --exit-code README.md` 为 0 → CI 不会回退这段文案（但表格区仍禁手改）。注意生成器写 LF、checkout 出 CRLF，因此本地跑完 `git status` 可能残留"格式脏"，`git checkout -- README.md` 即可。
+- **发布的脚本靠 push main 生效**：README 的 `curl` 从 `raw.githubusercontent.com/Just-Silver/just-silver-skills/main/scripts/*.sh` 取，改动必须先推 main。这类提交不会产生 CI 运行记录，**别用"CI 没跑过"判断脚本没生效**（可对拉远端与本地字节是否一致来验证）。
+- **脚本没有 CI 兜底**：仓库里唯一无人守门的产物就是这两个 sh（技能有 README 生成器、workflow 有 actionlint）。改完只能人工冒烟，推荐下面这套隔离冒烟（只动 `%TEMP%`，绝不碰真实 `~/.agents/skills`）：先造一个陌生同名目录应被拒（exit 1）、再干净根目录装→卸应只剩他人技能、并验证"仓库删技能下次安装自动清理"。
+  ```pwsh
+  $env:JSS_SKILLS_DEST = "$env:TEMP\jss-smoke\skills"
+  $env:JSS_LEGACY_SKILLS_DEST = "$env:TEMP\jss-smoke\legacy\just-silver-skills"
+  curl -fsSL https://raw.githubusercontent.com/Just-Silver/just-silver-skills/main/scripts/install-skills.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/Just-Silver/just-silver-skills/main/scripts/uninstall-skills.sh | bash
+  ```
+- **新增上游镜像合并前先查技能名重名**：安装按 frontmatter `name` 平铺，重名会 `exit 1` **整体拒装**（不部分安装）；当前 27 个技能名无重复。
+
 ## workflow 职责速查
 
 | workflow | 触发 | 动作 |
