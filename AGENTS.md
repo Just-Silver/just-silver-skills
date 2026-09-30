@@ -33,6 +33,7 @@
 
 - **并发**：直接推 main 的 workflow（update-readme / update-actionlint）共用 `concurrency.group: auto-commit-main`（`cancel-in-progress: false`）排队串行——回推类禁用 `true`（会取消还没 push 的运行，丢提交）；定时任务靠共用分组排队，不另找时间错峰。sync-* 推 `sync/*` 分支不直接推 main，用独立分组（`sync-<name>`）。
 - **回推前一律 `git pull --rebase`**（排队只保证不同时跑，不保证 base 最新，避免 non-fast-forward）。
+- **PowerShell 里判"有没有变更"必须看输出**：`$staged = git diff --cached --name-only` + `[string]::IsNullOrWhiteSpace($staged)`；**别写 `if (git diff --cached --quiet)`**——PowerShell 取的是命令 stdout（为空恒假），分支永不执行，无变更时照样 commit/pull/push 空转并打印"已自动提交并推送"（2026-09-30 已在 update-readme / update-actionlint 修掉，同类写法见 sync-upstream-skills.yml 注释）。
 - **防循环链**：`skills/**` 变更 → update-readme → 只提交 `README.md`（不在 `skills/**` 内）→ 终止。改 `update-readme.yml` 时保留 `paths` 过滤。
 - **上传 `.github/workflows/` 文件**一律用 git push（REST API 无 Workflows 权限）。
 - **新增/修改 schedule 类 workflow 后必须立即 `gh workflow run` 手动冒烟**，不得等调度窗口（路径 bug 曾潜伏到首次手动触发才暴露）。
