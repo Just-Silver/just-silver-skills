@@ -47,7 +47,7 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 | 类内 `new` 业务依赖（仓储、邮件、HttpClient…） | 把代码焊死在某个实现上，无法替换/测试 | 构造函数注入抽象；基础设施在 Composition Root 组装 |
 | Service Locator（`IServiceProvider.GetService`、`Ioc.Default`、静态容器） | 依赖被隐藏，错误从编译期推迟到运行期 | 构造函数注入；确需运行期选择时用抽象工厂/策略 |
 | 引入第三方 / 自研 DI 容器 | 与官方生态脱节、多套生命周期语义 | 统一 `Microsoft.Extensions.DependencyInjection`（Generic Host / `ServiceCollection`） |
-| MVVM 手写 `INotifyPropertyChanged` 样板；`[ObservableProperty]` 用旧字段写法 `private string? _name;` | 样板多、无源生成、与官方推荐脱节 | CommunityToolkit.Mvvm 8.4+，用 `[ObservableProperty] public partial string? Name { get; set; }` |
+| MVVM 手写 `INotifyPropertyChanged` 样板；`[ObservableProperty]` 用旧字段写法 `private string? _name;` | 字段式生成的属性对**同编译内其它源生成器不可见**（如 STJ 源生成），序列化会**静默丢字段**（写出 `{}`） | CommunityToolkit.Mvvm 8.4+，用 `[ObservableProperty] public partial string? Name { get; set; }`；**VM 之外的配置/序列化类型同样适用** |
 | 静态可变状态 / 全局上下文 / 静态工具类承载业务 | 隐式全局状态，并发与测试噩梦 | 无状态服务 + DI；纯函数工具才可静态 |
 | 应用/业务层直接依赖 `DbContext`、`SqlConnection`、`HttpClient`、`DateTime.Now`、文件系统 | 高层耦合具体基础设施 | 通过接口/边界接入；时间用 `TimeProvider`，HTTP 用 `IHttpClientFactory` |
 | 万能类：`XxxManager` / `XxxHelper` / `XxxUtil` / 超长 `Service` | 职责发散，一个类多个变化原因 | 按职责拆分，让行为回到所属对象 |

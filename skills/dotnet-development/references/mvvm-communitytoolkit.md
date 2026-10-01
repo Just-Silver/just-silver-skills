@@ -54,7 +54,7 @@ partial void OnAgeChanging(int oldValue, int newValue) { /* 变更前，可访�
 
 要点：
 - 属性必须 `public partial`、实例（非 `static`）、有 getter 与**非 init-only** 的 setter，且是“无实现的分部定义部分”（MVVMTK0043 / MVVMTK0052）。
-- 初始化在**构造函数**里赋值，例如 `Name = string.Empty;`（不要在 partial 声明上写字段式初始化）。
+- 初始化：**可在偏属性声明上直接写属性初始化器**（推荐）——`public partial string Name { get; set; } = string.Empty;`；也可在构造函数中赋值。**禁止**的是旧字段式初始化（`private string _name = "";`），不是"不能在声明上写初始化器"。
 - 校验特性、`[NotifyPropertyChangedFor]` 等**直接写在属性上**（不再需要字段式的 `[property: ]` 目标）。
 
 ### ❌ 禁止旧字段写法
@@ -64,6 +64,9 @@ partial void OnAgeChanging(int oldValue, int newValue) { /* 变更前，可访�
 [ObservableProperty]
 private string? _name;
 ```
+
+> **为什么强制偏属性写法**：字段式 `[ObservableProperty]` 生成的属性对**同一编译内的其它源生成器不可见**——例如 System.Text.Json 源生成看不到它，序列化时**静默丢字段（写出 `{}`）而不报错**。
+> 因此适用范围**不止 VM**：任何可能被其它源生成器（STJ 序列化、配置绑定等）看到的类型——**配置类型、持久化模型**——都必须用偏属性写法。
 
 ### 依赖属性 / 依赖命令通知
 
