@@ -1,6 +1,6 @@
 ---
 name: dotnet-development
-description: Use when writing, modifying, or reviewing C# / .NET code in any project type (ASP.NET Core, WPF, WinForms, Avalonia, MAUI, Blazor, console, worker, class library) — designing classes and services, registering or resolving dependencies, choosing service lifetimes, structuring modules/layers, building MVVM ViewModels with CommunityToolkit.Mvvm, or deciding whether an abstraction, interface, or design pattern is warranted. Enforces Microsoft.Extensions DI + dependency inversion, composition over inheritance, SOLID, strategy/polymorphism, options/ILogger/IHttpClientFactory, and rejects service locator, god classes, hidden dependencies, and architecture for its own sake.
+description: Use when writing, modifying, or reviewing C# / .NET code in any project type (ASP.NET Core, WPF, WinForms, Avalonia, MAUI, Blazor, console, worker, class library) — designing classes and services, registering or resolving dependencies, choosing service lifetimes, structuring modules/layers, building MVVM ViewModels with CommunityToolkit.Mvvm, deciding whether an abstraction, interface, or design pattern is warranted, or when about to introduce a service locator, hidden dependency, god class, or abstraction "for architecture's sake".
 ---
 
 # .NET 开发规范
