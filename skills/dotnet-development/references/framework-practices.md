@@ -123,7 +123,7 @@ public sealed class OrderService
 
 - I/O 绑定一律 `async/await`；库代码用 `ConfigureAwait(false)`（需要回到 UI 线程的代码除外；ASP.NET Core 无同步上下文，`ConfigureAwait(false)` 非必需）。
 - 禁止 `.Result` / `.Wait()`（死锁 + `AggregateException`）。
-- 禁止 `async void`，事件处理器除外。
+- 禁止 `async void`；仅**框架回调 / override**（WPF `OnStartup`/`OnExit`、WinForms 事件等签名不可改的框架回调，本质同事件处理器）例外。
 - 公开异步方法接受 `CancellationToken` 并向下传递：
   ```csharp
   public async Task<IReadOnlyList<Order>> GetAsync(CancellationToken ct = default)

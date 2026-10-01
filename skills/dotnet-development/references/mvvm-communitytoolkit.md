@@ -4,12 +4,13 @@
 > DI 容器一律使用 **Microsoft.Extensions.DependencyInjection**（经 Generic Host 或 `ServiceCollection`）。
 > 内容依据 Microsoft 官方文档整理；API 存疑时以官方文档为准，禁止臆造。
 
-## 1. 前置要求
+## 1. 前置要求（最低版本）
 
-| 项 | 要求 |
-|----|------|
-| 包 | `CommunityToolkit.Mvvm` **8.4 或更高** |
-| 语言 | 偏属性写法需 **C# `preview` 或 C# 14**（报 `MVVMTK0041` / `CS9248` 就把 `<LangVersion>` 设为 `preview`） |
+| 项 | 最低要求 | 说明 |
+|----|---------|------|
+| 包 | `CommunityToolkit.Mvvm` **8.4+** | 偏属性支持自 8.4 起 |
+| 语言 | `<LangVersion>preview</LangVersion>` | 生成代码用到 `field` 关键字：C# 13 稳定版没有，故 **.NET 9 SDK 必须用 `preview`**；**C# 14（.NET 10 SDK）**已稳定含 `field`，可直接写 `14` |
+| 注意 | `latest` 随 SDK 浮动 | 只有所用 SDK 的 latest ≥ C# 14（即 .NET 10 SDK）时 `latest` 才可用；.NET 9 SDK 上 `latest` = C# 13，会报 `MVVMTK0041` / `CS9248`——报错就把 `<LangVersion>` 改为 `preview` |
 
 ```xml
 <PropertyGroup>
@@ -65,8 +66,9 @@ partial void OnAgeChanging(int oldValue, int newValue) { /* 变更前，可访�
 private string? _name;
 ```
 
-> **为什么强制偏属性写法**：字段式 `[ObservableProperty]` 生成的属性对**同一编译内的其它源生成器不可见**——例如 System.Text.Json 源生成看不到它，序列化时**静默丢字段（写出 `{}`）而不报错**。
-> 因此适用范围**不止 VM**：任何可能被其它源生成器（STJ 序列化、配置绑定等）看到的类型——**配置类型、持久化模型**——都必须用偏属性写法。
+> **为什么强制偏属性写法**：字段式 `[ObservableProperty]` 生成的属性对**同一编译内的其它源生成器不可见**——例如 System.Text.Json **源生成（`JsonSerializerContext`）**看不到它，序列化时**静默丢字段（写出 `{}`）而不报错**。此坑**只发生在源生成路径**；反射式 `JsonSerializer.Serialize(obj)` 不受影响（运行时能看到生成后的属性）。
+> 因此适用范围**不止 VM**：凡是**同时**使用 `[ObservableProperty]`、又可能被其它源生成器（STJ 序列化、配置绑定等）看到的类型（例如既做变更通知、又参与序列化的持久化模型），都必须用偏属性写法。
+> **注意**：普通配置 / DTO / 持久化模型本身**不需要** `[ObservableProperty]`——用普通自动属性即可（对源生成器天然可见）；只有确实需要变更通知时才上 `[ObservableProperty]`，且一旦用了就必须是偏属性写法。
 
 ### 依赖属性 / 依赖命令通知
 

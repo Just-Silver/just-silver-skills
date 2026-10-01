@@ -58,7 +58,7 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 | `Environment.GetEnvironmentVariable` 散读配置 | 魔法字符串、无校验、无法热更新 | Options 强类型绑定 + 校验 |
 | `new HttpClient()`、`HttpClient` 当字段长期持有而不设 `PooledConnectionLifetime` | 端口耗尽 / DNS 不更新 | `IHttpClientFactory` typed client（或长生命周期 client + `PooledConnectionLifetime`） |
 | `try { } catch (Exception) { }` 静默吞异常；无意义 `catch` 后重包；每层 `catch`+记日志+`throw` 重复记录 | 掩盖故障、丢失原始信息、日志噪音 | 只捕获能处理的；否则继续抛出；必要时补上下文并保留 `InnerException`；异常只在**能处理或需补上下文**的层记录一次 |
-| `.Result` / `.Wait()` / `async void`（事件处理器除外） | 死锁、异常语义丢失 | `async/await` 全程；`async Task` + `CancellationToken` |
+| `.Result` / `.Wait()` / `async void`（事件处理器、框架回调/override 除外） | 死锁、异常语义丢失 | `async/await` 全程；`async Task` + `CancellationToken` |
 
 ## 开发顺序（正向配方）
 
