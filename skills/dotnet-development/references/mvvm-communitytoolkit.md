@@ -9,8 +9,8 @@
 | 项 | 最低要求 | 说明 |
 |----|---------|------|
 | 包 | `CommunityToolkit.Mvvm` **8.4+** | 偏属性支持自 8.4 起 |
-| 语言 | `<LangVersion>preview</LangVersion>` | 生成代码用到 `field` 关键字：C# 13 稳定版没有，故 **.NET 9 SDK 必须用 `preview`**；**C# 14（.NET 10 SDK）**已稳定含 `field`，可直接写 `14` |
-| 注意 | `latest` 随 SDK 浮动 | 只有所用 SDK 的 latest ≥ C# 14（即 .NET 10 SDK）时 `latest` 才可用；.NET 9 SDK 上 `latest` = C# 13，会报 `MVVMTK0041` / `CS9248`——报错就把 `<LangVersion>` 改为 `preview` |
+| 语言 | **C# 14+** | 生成代码用到 `field` 关键字，C# 14 起稳定支持；C# 13 稳定版不支持（会报 `MVVMTK0041` / `CS9248`） |
+| 注意 | `latest` 随 SDK 浮动 | 只有所用 SDK 的 latest ≥ C# 14（即 .NET 10 SDK）时才满足最低要求 |
 
 ```xml
 <PropertyGroup>
@@ -194,7 +194,7 @@ builder.Services.AddSingleton<MainWindow>();
 ## 8. 常见错误
 
 1. **用旧字段式 `[ObservableProperty]`**：新代码一律用 `public partial` 属性写法（字段式会静默丢序列化字段，见上）。
-2. **包版本 < 8.4 / 语言版本不足**：不支持 partial property 写法；语言版本需 `preview` 或 C# 14。
+2. **包版本 < 8.4 / 语言版本不足**：不支持 partial property 写法；语言版本需 C# 14 或更高。
 3. **在 VM 里 `new` 服务或 `Ioc.Default.GetService`**：隐藏依赖、破坏可测性。
 4. **每文档/每次打开的 VM 注册成 `Singleton`**：状态串味、关闭后再打开报错。
 5. **`CanExecute` 忘了失效**：属性变化后用 `[NotifyCanExecuteChangedFor]` 或 `NotifyCanExecuteChanged()`。
