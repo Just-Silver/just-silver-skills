@@ -19,6 +19,7 @@ curl -fsSL https://raw.githubusercontent.com/Just-Silver/just-silver-skills/main
 | 技能 | 介绍 | 跳转位置 |
 |------|------|----------|
 | bootstrapblazor | Use when working with BootstrapBlazor (also called BB, bb, or bootstrapblazor) components and needing their... | [skills/bootstrapblazor/](skills/bootstrapblazor/) |
+| dotnet-development | Use when writing, modifying, or reviewing C# / .NET code in any project type (ASP.NET Core, WPF, WinForms, ... | [skills/dotnet-development/](skills/dotnet-development/) |
 | github-actions | Use when creating or editing GitHub Actions or Gitea Actions workflow YAML (.github/workflows/*.yml, .gitea... | [skills/github-actions/](skills/github-actions/) |
 
 <!-- /AUTO-GENERATED -->

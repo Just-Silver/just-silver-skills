@@ -1,0 +1,207 @@
+# CommunityToolkit.Mvvm（mvvm-communitytoolkit）
+
+> MVVM 一律使用 **CommunityToolkit.Mvvm**，禁止手写 `INotifyPropertyChanged` 样板。
+> DI 容器一律使用 **Microsoft.Extensions.DependencyInjection**（经 Generic Host 或 `ServiceCollection`）。
+> 内容依据 Microsoft 官方文档整理；API 存疑时以官方文档为准，禁止臆造。
+
+## 1. 前置要求（硬性）
+
+| 项 | 要求 |
+|----|------|
+| 包 | `CommunityToolkit.Mvvm` **8.4 或更高**（`[ObservableProperty]` 用于 partial property 自 8.4 起支持；建议 8.4.1+） |
+| 语言/SDK | C# 13+（partial properties）/ .NET 9 SDK+；8.4.0 需 `<LangVersion>preview</LangVersion>`，8.4.1+ 默认即可 |
+| 类型 | 使用生成器的类必须声明为 `partial`；嵌套时声明树中所有类型都要 `partial` |
+
+```xml
+<PropertyGroup>
+  <LangVersion>latest</LangVersion>
+</PropertyGroup>
+<ItemGroup>
+  <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.1" />
+  <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+</ItemGroup>
+```
+
+## 2. 三个基类怎么选
+
+| 基类 | 提供 | 用于 |
+|------|------|------|
+| `ObservableObject` | `INotifyPropertyChanged` / `INotifyPropertyChanging` | 普通 VM |
+| `ObservableValidator` | 在 `ObservableObject` 之上实现 `INotifyDataErrorInfo` | 需要输入校验的 VM |
+| `ObservableRecipient` | 在 `ObservableValidator` 之上集成 `IMessenger`、`IsActive` | 需要收发消息的 VM |
+
+## 3. `[ObservableProperty]`（强制新写法）
+
+### ✅ 使用 partial property（本规范强制）
+
+```csharp
+public partial class UserEditViewModel : ObservableObject
+{
+    [ObservableProperty]
+    public partial string? Name { get; set; }
+
+    [ObservableProperty]
+    public partial int Age { get; set; }
+}
+```
+
+生成器补全实现并暴露 `OnNameChanged` / `OnNameChanging` 等分部方法：
+
+```csharp
+partial void OnNameChanged(string? value) { /* 属性变更后 */ }
+partial void OnAgeChanging(int oldValue, int newValue) { /* 变更前，可访问新旧值 */ }
+```
+
+要点：
+- 属性必须 `public partial`、实例（非 `static`）、有 getter 与**非 init-only** 的 setter，且是“无实现的分部定义部分”（MVVMTK0043 / MVVMTK0052）。
+- 初始化在**构造函数**里赋值，例如 `Name = string.Empty;`（不要在 partial 声明上写字段式初始化）。
+- 校验特性、`[NotifyPropertyChangedFor]` 等**直接写在属性上**（不再需要字段式的 `[property: ]` 目标）。
+
+### ❌ 禁止旧字段写法
+
+```csharp
+// 旧写法：仅为兼容旧项目，新代码禁止
+[ObservableProperty]
+private string? _name;
+```
+
+### 依赖属性 / 依赖命令通知
+
+```csharp
+[ObservableProperty]
+[NotifyPropertyChangedFor(nameof(FullName))]      // Name 变 → 通知 FullName
+[NotifyCanExecuteChangedFor(nameof(SaveCommand))] // Name 变 → 重新评估命令可用性
+public partial string? Name { get; set; }
+```
+
+### 触发校验（配合 `ObservableValidator`）
+
+```csharp
+public partial class UserEditViewModel : ObservableValidator
+{
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [Required(ErrorMessage = "姓名必填")]
+    [MinLength(2)]
+    public partial string? Name { get; set; }
+}
+```
+
+### 通过消息广播属性变化（配合 `ObservableRecipient`）
+
+```csharp
+[ObservableProperty]
+[NotifyPropertyChangedRecipients]
+public partial string? Name { get; set; }
+```
+
+## 4. `[RelayCommand]`
+
+```csharp
+// 异步命令；方法名去掉 Async 后缀 + Command 得到命令名 SaveCommand
+[RelayCommand(CanExecute = nameof(CanSave), AllowConcurrentExecutions = false)]
+private async Task SaveAsync(CancellationToken ct)
+{
+    // 传 CancellationToken 时，命令自动支持 IAsyncRelayCommand.Cancel
+}
+
+private bool CanSave() => !IsBusy;
+```
+
+| 特性参数 | 作用 |
+|----------|------|
+| `CanExecute = nameof(...)` | 指定可执行性判定方法/属性；属性变化时用 `[NotifyCanExecuteChangedFor]` 或手动 `NotifyCanExecuteChanged()` 失效 |
+| `AllowConcurrentExecutions` | 默认 `false`：命令执行期间自动禁用（防重复点击）；`true` 允许并发排队 |
+| `IncludeCancelCommand = true` | 额外生成 `XxxCancelCommand` 用于取消 |
+| `FlowExceptionsToTaskScheduler` | 默认 `false`（等待并重抛）；`true` 时异常不再崩溃应用，改为流向 `TaskScheduler` |
+
+命名规则：去掉 `On` 前缀、去掉 `Async` 后缀，再追加 `Command`。
+
+## 5. 验证（`ObservableValidator`）
+
+```csharp
+public partial class UserEditViewModel : ObservableValidator
+{
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [Required]
+    [EmailAddress]
+    public partial string? Email { get; set; }
+
+    [RelayCommand(CanExecute = nameof(CanSave))]
+    private async Task SaveAsync(CancellationToken ct)
+    {
+        ValidateAllProperties();
+        if (HasErrors) { /* 提示用户 */ return; }
+        // ...
+    }
+
+    private bool CanSave() => !HasErrors;
+}
+```
+
+- 特性：`[Required]`、`[EmailAddress]`、`[Range]`、`[MinLength]` 等 DataAnnotations，或自定义 `ValidationAttribute` / `[CustomValidation]`。
+- 提供 `ValidateProperty`、`ValidateAllProperties`、`ClearAllErrors`、`GetErrors`、`HasErrors`、`ErrorsChanged`。
+- 设计上只有继承自 `ValidationAttribute` 的特性会被转发；其余自定义特性请改用传统手写属性。
+
+## 6. Messenger（`IMessenger`）
+
+用于解耦模块间通信，避免强引用。
+
+```csharp
+public sealed class LoggedInUserChangedMessage : ValueChangedMessage<User>
+{
+    public LoggedInUserChangedMessage(User user) : base(user) { }
+}
+
+// 发送
+messenger.Send(new LoggedInUserChangedMessage(user));
+
+// 接收（实现 IRecipient<T> 并 RegisterAll，或用 lambda 注册）
+public sealed partial class ShellViewModel : ObservableRecipient, IRecipient<LoggedInUserChangedMessage>
+{
+    public ShellViewModel(IMessenger messenger) : base(messenger) { }
+
+    public void Receive(LoggedInUserChangedMessage message) { /* ... */ }
+}
+```
+
+- 两种实现：`WeakReferenceMessenger`（默认，弱引用，自动回收）与 `StrongReferenceMessenger`（强引用，性能更好但需手动 `Unregister`）。
+- 在 DI 中注册一次并注入：`services.AddSingleton<IMessenger>(WeakReferenceMessenger.Default);`
+- 支持通道 token、`RequestMessage<T>` / `AsyncRequestMessage<T>` 等请求-应答模式。
+- `ObservableRecipient` 配合 `IsActive` 可在激活时自动 `RegisterAll`、停用时自动注销。
+
+## 7. 与 DI 集成（Microsoft.Extensions.DependencyInjection）
+
+```csharp
+// App 组合根 / Program
+var builder = Host.CreateApplicationBuilder();
+builder.Services.AddSingleton<IMessenger>(WeakReferenceMessenger.Default);
+builder.Services.AddSingleton<IUserService, UserService>();
+builder.Services.AddSingleton<ShellViewModel>();
+builder.Services.AddTransient<UserEditViewModel>();   // 每次打开新实例
+builder.Services.AddSingleton<MainWindow>();
+```
+
+- VM 通过**构造函数**接收服务、子 VM 与 `IMessenger`；不要在 VM 里 `new` 服务。
+- **禁止 `CommunityToolkit.Mvvm.DependencyInjection.Ioc.Default`** 作为常规取依赖方式（等价于 Service Locator）；仅设计时数据等无法构造注入的逃生场景可用。
+- 窗口/页面通过构造函数注入 VM，在隐藏代码里设置 `DataContext`。
+
+## 8. 常见错误
+
+1. **用旧字段式 `[ObservableProperty]`**：新代码一律用 `public partial` 属性写法。
+2. **类漏写 `partial`**：生成器无法生成分部声明，直接编译错误。
+3. **partial 属性写成 `init` / `static` / 带实现**：触发 MVVMTK0043 / MVVMTK0052。
+4. **包版本 < 8.4**：partial property 写法不支持；8.4.0 还需 `LangVersion=preview`。
+5. **在 VM 里 `new` 服务或 `Ioc.Default.GetService`**：隐藏依赖、破坏可测性。
+6. **每文档/每次打开的 VM 注册成 `Singleton`**：状态串味、关闭后再打开报错。
+7. **`CanExecute` 忘了失效**：属性变化后用 `[NotifyCanExecuteChangedFor]` 或 `NotifyCanExecuteChanged()`。
+
+## 9. 参考
+
+- MVVM Toolkit 概览 — https://learn.microsoft.com/dotnet/communitytoolkit/mvvm/
+- ObservableProperty — https://learn.microsoft.com/dotnet/communitytoolkit/mvvm/generators/observableproperty
+- RelayCommand — https://learn.microsoft.com/dotnet/communitytoolkit/mvvm/generators/relaycommand
+- ObservableValidator — https://learn.microsoft.com/dotnet/communitytoolkit/mvvm/observablevalidator
+- Messenger — https://learn.microsoft.com/dotnet/communitytoolkit/mvvm/messenger
+- 8.4 发布说明（partial properties）— https://devblogs.microsoft.com/dotnet/announcing-the-dotnet-community-toolkit-840/
