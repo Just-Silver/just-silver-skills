@@ -4,13 +4,12 @@
 > DI 容器一律使用 **Microsoft.Extensions.DependencyInjection**（经 Generic Host 或 `ServiceCollection`）。
 > 内容依据 Microsoft 官方文档整理；API 存疑时以官方文档为准，禁止臆造。
 
-## 1. 前置要求（硬性）
+## 1. 前置要求
 
 | 项 | 要求 |
 |----|------|
-| 包 | `CommunityToolkit.Mvvm` **8.4 或更高**（`[ObservableProperty]` 用于 partial property 自 8.4 起支持；建议 8.4.1+） |
-| 语言/SDK | C# 13+（partial properties）/ .NET 9 SDK+；8.4.0 需 `<LangVersion>preview</LangVersion>`，8.4.1+ 默认即可 |
-| 类型 | 使用生成器的类必须声明为 `partial`；嵌套时声明树中所有类型都要 `partial` |
+| 包 | `CommunityToolkit.Mvvm` **8.4 或更高** |
+| 语言 | 偏属性写法需 **C# `preview` 或 C# 14**（报 `MVVMTK0041` / `CS9248` 就把 `<LangVersion>` 设为 `preview`） |
 
 ```xml
 <PropertyGroup>
@@ -27,8 +26,10 @@
 | 基类 | 提供 | 用于 |
 |------|------|------|
 | `ObservableObject` | `INotifyPropertyChanged` / `INotifyPropertyChanging` | 普通 VM |
-| `ObservableValidator` | 在 `ObservableObject` 之上实现 `INotifyDataErrorInfo` | 需要输入校验的 VM |
-| `ObservableRecipient` | 在 `ObservableValidator` 之上集成 `IMessenger`、`IsActive` | 需要收发消息的 VM |
+| `ObservableValidator` | 在 `ObservableObject` 上实现 `INotifyDataErrorInfo` | 需要输入校验的 VM |
+| `ObservableRecipient` | 在 `ObservableObject` 上集成 `IMessenger`、`IsActive` | 需要收发消息的 VM |
+
+> `ObservableValidator` 与 `ObservableRecipient` 是 `ObservableObject` 下**并列的两条分支**，`ObservableRecipient` **不含校验**。需要「校验 + 消息」时：在 `ObservableValidator` 上自行实现 `IRecipient<T>` 并注册，或继承 `ObservableRecipient` 自行实现校验。
 
 ## 3. `[ObservableProperty]`（强制新写法）
 
@@ -53,9 +54,8 @@ partial void OnAgeChanging(int oldValue, int newValue) { /* 变更前，可访�
 ```
 
 要点：
-- 属性必须 `public partial`、实例（非 `static`）、有 getter 与**非 init-only** 的 setter，且是“无实现的分部定义部分”（MVVMTK0043 / MVVMTK0052）。
-- 初始化：**可在偏属性声明上直接写属性初始化器**（推荐）——`public partial string Name { get; set; } = string.Empty;`；也可在构造函数中赋值。**禁止**的是旧字段式初始化（`private string _name = "";`），不是"不能在声明上写初始化器"。
-- 校验特性、`[NotifyPropertyChangedFor]` 等**直接写在属性上**（不再需要字段式的 `[property: ]` 目标）。
+- 初始化直接在偏属性声明上写即可：`public partial string Name { get; set; } = string.Empty;`。
+- 校验特性、`[NotifyPropertyChangedFor]` 等**直接写在属性上**。
 
 ### ❌ 禁止旧字段写法
 
@@ -145,7 +145,6 @@ public partial class UserEditViewModel : ObservableValidator
 
 - 特性：`[Required]`、`[EmailAddress]`、`[Range]`、`[MinLength]` 等 DataAnnotations，或自定义 `ValidationAttribute` / `[CustomValidation]`。
 - 提供 `ValidateProperty`、`ValidateAllProperties`、`ClearAllErrors`、`GetErrors`、`HasErrors`、`ErrorsChanged`。
-- 设计上只有继承自 `ValidationAttribute` 的特性会被转发；其余自定义特性请改用传统手写属性。
 
 ## 6. Messenger（`IMessenger`）
 
@@ -192,13 +191,11 @@ builder.Services.AddSingleton<MainWindow>();
 
 ## 8. 常见错误
 
-1. **用旧字段式 `[ObservableProperty]`**：新代码一律用 `public partial` 属性写法。
-2. **类漏写 `partial`**：生成器无法生成分部声明，直接编译错误。
-3. **partial 属性写成 `init` / `static` / 带实现**：触发 MVVMTK0043 / MVVMTK0052。
-4. **包版本 < 8.4**：partial property 写法不支持；8.4.0 还需 `LangVersion=preview`。
-5. **在 VM 里 `new` 服务或 `Ioc.Default.GetService`**：隐藏依赖、破坏可测性。
-6. **每文档/每次打开的 VM 注册成 `Singleton`**：状态串味、关闭后再打开报错。
-7. **`CanExecute` 忘了失效**：属性变化后用 `[NotifyCanExecuteChangedFor]` 或 `NotifyCanExecuteChanged()`。
+1. **用旧字段式 `[ObservableProperty]`**：新代码一律用 `public partial` 属性写法（字段式会静默丢序列化字段，见上）。
+2. **包版本 < 8.4 / 语言版本不足**：不支持 partial property 写法；语言版本需 `preview` 或 C# 14。
+3. **在 VM 里 `new` 服务或 `Ioc.Default.GetService`**：隐藏依赖、破坏可测性。
+4. **每文档/每次打开的 VM 注册成 `Singleton`**：状态串味、关闭后再打开报错。
+5. **`CanExecute` 忘了失效**：属性变化后用 `[NotifyCanExecuteChangedFor]` 或 `NotifyCanExecuteChanged()`。
 
 ## 9. 参考
 

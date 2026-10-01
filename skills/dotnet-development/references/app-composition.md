@@ -81,7 +81,7 @@ builder.Services.AddSingleton<MainWindow>();
 _host = builder.Build();
 ```
 
-> 也可用 `Host.CreateDefaultBuilder()`（配置/日志更全）。二者都行，选一个即可。
+> 两者默认行为**等价**；新项目推荐 `Host.CreateApplicationBuilder`（`CreateDefaultBuilder` 是传统回调式，用于兼容旧代码）。
 
 ### 注入窗口与 ViewModel
 

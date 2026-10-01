@@ -23,9 +23,9 @@ services.AddSingleton<ReportService>();   // 依赖 IRepository(Scoped)
 services.AddScoped<IRepository, EfRepository>();
 ```
 
-- Singleton 只能依赖 Singleton（`IOptions`、`IOptionsMonitor`、`ILogger` 都是 Singleton，安全）。
-- Scoped/Transient 服务可以依赖 Scoped/Transient/Singleton。
-- `IOptionsSnapshot` 是 Scoped，**不能**注入 Singleton。
+- 真正要避免的是 **Singleton 捕获 Scoped**（如 `IOptionsSnapshot`、`DbContext`）——开发环境 `ValidateScopes`/`ValidateOnBuild` 会直接报错。
+- Singleton 依赖 Transient 是**允许**的，但该 Transient 会被提升为单例生命周期、**必须线程安全**。
+- `IOptions`/`IOptionsMonitor`/`ILogger` 都是 Singleton，可安全注入任何生命周期。
 - **typed client（`AddHttpClient<T>`）是 Transient**，不要被 Singleton 捕获（见第 4 节）。
 
 ### 开启动态校验（开发环境）
@@ -121,7 +121,7 @@ public sealed class OrderService
 
 ## 6. async / await
 
-- I/O 绑定一律 `async/await`；库代码用 `ConfigureAwait(false)`（UI/ASP.NET 上下文敏感的代码除外）。
+- I/O 绑定一律 `async/await`；库代码用 `ConfigureAwait(false)`（需要回到 UI 线程的代码除外；ASP.NET Core 无同步上下文，`ConfigureAwait(false)` 非必需）。
 - 禁止 `.Result` / `.Wait()`（死锁 + `AggregateException`）。
 - 禁止 `async void`，事件处理器除外。
 - 公开异步方法接受 `CancellationToken` 并向下传递：
