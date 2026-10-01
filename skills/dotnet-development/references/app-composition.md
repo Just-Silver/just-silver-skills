@@ -10,6 +10,7 @@
 - Web（ASP.NET Core）天然有 `Program.cs`。
 - **桌面与控制台默认没有**——必须主动引入 `Microsoft.Extensions.Hosting`（或至少 `Microsoft.Extensions.DependencyInjection`）。
 - 组装点**只**在启动/退出时碰容器；业务代码里出现 `GetService` / `Ioc.Default` 即 Service Locator 反模式。
+- **例外**：组合根 / 框架适配层（无法构造函数注入，如应用基类按运行时类型解析主窗口、导航按类型解析页面）可持有 `IServiceProvider` 并按类型解析，须在 XML 注释写明理由。
 
 最小依赖：
 
