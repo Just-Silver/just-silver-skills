@@ -4,14 +4,7 @@
 > DI 容器一律使用 **Microsoft.Extensions.DependencyInjection**（经 Generic Host 或 `ServiceCollection`）。
 > 内容依据 Microsoft 官方文档整理；API 存疑时以官方文档为准，禁止臆造。
 
-## 1. 前置要求（最低版本）
-
-| 项 | 最低版本 |
-|----|---------|
-| `CommunityToolkit.Mvvm` | **8.4.1** |
-| .NET | **10** |
-
-## 2. 三个基类怎么选
+## 1. 三个基类怎么选
 
 | 基类 | 提供 | 用于 |
 |------|------|------|
@@ -21,7 +14,7 @@
 
 > `ObservableValidator` 与 `ObservableRecipient` 是 `ObservableObject` 下**并列的两条分支**，`ObservableRecipient` **不含校验**。需要「校验 + 消息」时：在 `ObservableValidator` 上自行实现 `IRecipient<T>` 并注册，或继承 `ObservableRecipient` 自行实现校验。
 
-## 3. `[ObservableProperty]`（强制新写法）
+## 2. `[ObservableProperty]`（强制新写法）
 
 ### ✅ 使用 partial property（本规范强制）
 
@@ -89,7 +82,7 @@ public partial class UserEditViewModel : ObservableValidator
 public partial string? Name { get; set; }
 ```
 
-## 4. `[RelayCommand]`
+## 3. `[RelayCommand]`
 
 ```csharp
 // 异步命令；方法名去掉 Async 后缀 + Command 得到命令名 SaveCommand
@@ -111,7 +104,7 @@ private bool CanSave() => !IsBusy;
 
 命名规则：去掉 `On` 前缀、去掉 `Async` 后缀，再追加 `Command`。
 
-## 5. 验证（`ObservableValidator`）
+## 4. 验证（`ObservableValidator`）
 
 ```csharp
 public partial class UserEditViewModel : ObservableValidator
@@ -137,7 +130,7 @@ public partial class UserEditViewModel : ObservableValidator
 - 特性：`[Required]`、`[EmailAddress]`、`[Range]`、`[MinLength]` 等 DataAnnotations，或自定义 `ValidationAttribute` / `[CustomValidation]`。
 - 提供 `ValidateProperty`、`ValidateAllProperties`、`ClearAllErrors`、`GetErrors`、`HasErrors`、`ErrorsChanged`。
 
-## 6. Messenger（`IMessenger`）
+## 5. Messenger（`IMessenger`）
 
 用于解耦模块间通信，避免强引用。
 
@@ -164,7 +157,7 @@ public sealed partial class ShellViewModel : ObservableRecipient, IRecipient<Log
 - 支持通道 token、`RequestMessage<T>` / `AsyncRequestMessage<T>` 等请求-应答模式。
 - `ObservableRecipient` 配合 `IsActive` 可在激活时自动 `RegisterAll`、停用时自动注销。
 
-## 7. 与 DI 集成（Microsoft.Extensions.DependencyInjection）
+## 6. 与 DI 集成（Microsoft.Extensions.DependencyInjection）
 
 ```csharp
 // App 组合根 / Program
@@ -181,15 +174,14 @@ builder.Services.AddSingleton<MainWindow>();
 - 窗口/页面通过构造函数注入 VM，在隐藏代码里设置 `DataContext`。
 - **code-behind 的允许清单只有三条**：`InitializeComponent`、设置 `DataContext`、纯视图初始化（焦点 / 动画 / 窗口行为）；**不得**承载业务逻辑、状态联动、模型改动——视图事件一律转成命令或绑定。
 
-## 8. 常见错误
+## 7. 常见错误
 
 1. **用旧字段式 `[ObservableProperty]`**：新代码一律用 `public partial` 属性写法（字段式会静默丢序列化字段，见上）。
-2. **包版本低于 8.4.1 / .NET 低于 10**：不支持 partial property 写法 → 升到最低版本；**别退回手写 `INotifyPropertyChanged`**。
-3. **在 VM 里 `new` 服务或 `Ioc.Default.GetService`**：隐藏依赖、破坏可测性。
-4. **每文档/每次打开的 VM 注册成 `Singleton`**：状态串味、关闭后再打开报错。
-5. **`CanExecute` 忘了失效**：属性变化后用 `[NotifyCanExecuteChangedFor]` 或 `NotifyCanExecuteChanged()`。
+2. **在 VM 里 `new` 服务或 `Ioc.Default.GetService`**：隐藏依赖、破坏可测性。
+3. **每文档/每次打开的 VM 注册成 `Singleton`**：状态串味、关闭后再打开报错。
+4. **`CanExecute` 忘了失效**：属性变化后用 `[NotifyCanExecuteChangedFor]` 或 `NotifyCanExecuteChanged()`。
 
-## 9. 参考
+## 8. 参考
 
 - MVVM Toolkit 概览 — https://learn.microsoft.com/dotnet/communitytoolkit/mvvm/
 - ObservableProperty — https://learn.microsoft.com/dotnet/communitytoolkit/mvvm/generators/observableproperty

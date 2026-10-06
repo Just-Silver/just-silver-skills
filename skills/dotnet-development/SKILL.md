@@ -19,7 +19,7 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 
 - **DI 容器**：一律 **Microsoft.Extensions.DependencyInjection**（经 `Host.CreateApplicationBuilder` / `Host.CreateDefaultBuilder` 或 `ServiceCollection`）；**不引入** Autofac / Unity / Prism 等第三方容器，也不自研容器。
 - **基础设施**：优先 **Microsoft.Extensions.\*** 官方包——`Hosting`、`Configuration.*`、`Options.*`、`Logging.*`、`Http`（`IHttpClientFactory`）、`Http.Resilience`、`Caching.*`、`DependencyInjection`。日志、配置、HTTP、缓存、健康检查都走这些抽象。
-- **MVVM**：一律 **CommunityToolkit.Mvvm（最低 8.4.1）**，环境最低 **.NET 10**；`[ObservableProperty]` **必须**用 partial property 新写法 `public partial string? Name { get; set; }`，**禁止**旧字段式 `private string? _name;`。详见 `references/mvvm-communitytoolkit.md`。
+- **MVVM**：一律 **CommunityToolkit.Mvvm**；`[ObservableProperty]` **必须**用 partial property 新写法 `public partial string? Name { get; set; }`，**禁止**旧字段式 `private string? _name;`。详见 `references/mvvm-communitytoolkit.md`。
 - **时间/测试**：时间用 `TimeProvider`；测试用 `Microsoft.Extensions.TimeProvider.Testing`。
 
 ## When to Use
@@ -41,7 +41,7 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 | WPF / WinForms / Avalonia / 控制台 / Worker 的 Composition Root、组装与项目结构 | `references/app-composition.md` |
 | **MVVM（任何 UI 框架）**：写 / 改任一视图（XAML/AXAML/code-behind）、ViewModel、数据绑定、`ICommand` 或输入校验 → **命中即读，先读本行**（不等“按需”） | `references/mvvm-communitytoolkit.md` |
 
-> **MVVM 只有一个权威出口：`references/mvvm-communitytoolkit.md`。** `app-composition.md` 里的「MVVM 要点」只是**摘录速查**，覆盖不了全部特性（缺 `[NotifyPropertyChangedFor]`、`CanExecute` 刷新细节、Messenger 用法、版本/语言门槛等）；**读过它不算读过 MVVM 规范**，不得据此跳过引用文件。
+> **MVVM 只有一个权威出口：`references/mvvm-communitytoolkit.md`。** `app-composition.md` 里的「MVVM 要点」只是**摘录速查**，覆盖不了全部特性（缺 `[NotifyPropertyChangedFor]`、`CanExecute` 刷新细节、Messenger 用法等）；**读过它不算读过 MVVM 规范**，不得据此跳过引用文件。
 
 ## CommunityToolkit.Mvvm 特性速查（写 VM 前扫一眼，禁止手写样板）
 
@@ -65,7 +65,7 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 | 类内 `new` 业务依赖（仓储、邮件、HttpClient…） | 把代码焊死在某个实现上，无法替换/测试 | 构造函数注入抽象；基础设施在 Composition Root 组装 |
 | Service Locator（`IServiceProvider.GetService`、`Ioc.Default`、静态容器） | 依赖被隐藏，错误从编译期推迟到运行期 | 构造函数注入；确需运行期选择时用抽象工厂/策略 |
 | 引入第三方 / 自研 DI 容器 | 与官方生态脱节、多套生命周期语义 | 统一 `Microsoft.Extensions.DependencyInjection`（Generic Host / `ServiceCollection`） |
-| MVVM 手写 `INotifyPropertyChanged` 样板；`[ObservableProperty]` 用旧字段写法 `private string? _name;` | 字段式生成的属性对**同编译内其它源生成器不可见**（如 STJ 源生成），序列化会**静默丢字段**（写出 `{}`） | CommunityToolkit.Mvvm 8.4.1+，用 `[ObservableProperty] public partial string? Name { get; set; }`；**VM 之外的配置/序列化类型同样适用** |
+| MVVM 手写 `INotifyPropertyChanged` 样板；`[ObservableProperty]` 用旧字段写法 `private string? _name;` | 字段式生成的属性对**同编译内其它源生成器不可见**（如 STJ 源生成），序列化会**静默丢字段**（写出 `{}`） | CommunityToolkit.Mvvm，用 `[ObservableProperty] public partial string? Name { get; set; }`；**VM 之外的配置/序列化类型同样适用** |
 | 视图（XAML/AXAML/code-behind）承载业务或状态逻辑：事件处理器里改模型、在 code-behind 手动 `IsEnabled`/可见性联动、`Click=` 里做业务、直接 `new` 服务 | UI 与业务耦合、无法单测、状态通知易漏 | code-behind 只做 `InitializeComponent`、设 `DataContext`、纯视图初始化（焦点/动画/窗口行为）；交互走 `[RelayCommand]` + 绑定，联动走生成钩子 / 通知特性 |
 | 手写 `ICommand` / 自造命令；**同对象内**联动用手写 `PropertyChanged` 订阅或手动刷新 `CanExecute`；输入无校验、或校验不门禁命令 | 样板易漏通知、命令可用性不刷新、按钮重复点击、非法输入仍可提交；且绕过源生成器 | `[RelayCommand]`（异步带 `CancellationToken`，默认执行期禁用防重复点击）；联动优先 `OnXxxChanged` 钩子 + `[NotifyPropertyChangedFor]` / `[NotifyCanExecuteChangedFor]`（**仅跨对象**才订阅）；校验 `ObservableValidator` + `[NotifyDataErrorInfo]`，命令用 `HasErrors` 门禁 |
 | VM / 视图直接调用 `TopLevel`、`StorageProvider`、`Application.Current`、`File.*`、`MessageBox` 等平台/宿主 API | 无法单测、耦合宿主、跨平台迁移受阻 | 抽 `IFilePicker` / `IDialogService` / `IClipboard` 之类接口，在组装点绑定实现、构造注入 |

@@ -163,9 +163,9 @@ public sealed class SyncWorker(IServiceScopeFactory scopes, ILogger<SyncWorker> 
 
 注册：`builder.Services.AddHostedService<SyncWorker>();`。长期运行的外部调用（HTTP）失败要记录并重试，不能拖垮主流程。
 
-## MVVM 要点（CommunityToolkit.Mvvm 8.4+，强制）
+## MVVM 要点（强制）
 
-> ⚠️ **本节只是摘录速查，不完整。** 任何 ViewModel / 数据绑定 / `ICommand` 改动都必须读 `mvvm-communitytoolkit.md`（全部特性、参数、版本要求）——本节覆盖不到 `[NotifyPropertyChangedFor]`、`CanExecute` 刷新细节、Messenger 用法、版本/语言门槛等，**读过本节不等于读过 MVVM 规范**。
+> ⚠️ **本节只是摘录速查，不完整。** 任何 ViewModel / 数据绑定 / `ICommand` 改动都必须读 `mvvm-communitytoolkit.md`（全部特性与参数）——本节覆盖不到 `[NotifyPropertyChangedFor]`、`CanExecute` 刷新细节、Messenger 用法等，**读过本节不等于读过 MVVM 规范**。
 
 - ViewModel 通过**构造函数**接收服务、子 VM 与 `IMessenger`；不要 `new` 服务，不要用 `Ioc.Default.GetService` 隐藏依赖。
 - 属性一律用 `[ObservableProperty]` 的 **partial property 新写法**；禁止手写 `INotifyPropertyChanged`，禁止旧字段写法：
@@ -187,7 +187,7 @@ public sealed class SyncWorker(IServiceScopeFactory scopes, ILogger<SyncWorker> 
 - 跨 VM/模块通信用注入的 `IMessenger`（默认 `WeakReferenceMessenger.Default`），在 DI 中注册一次。
 - 设计时数据用 `d:DataContext="{d:DesignInstance Type=vm:MainViewModel, IsDesignTimeCreatable=True}"`；必要时给无参构造仅供设计器。
 - 错误处理分层：服务层记日志并抛；VM 捕获后转成用户可见提示，不让 UI 崩溃。
-- 版本/语言要求与完整用法（属性、命令、验证、Messenger、DI 集成）见 `mvvm-communitytoolkit.md`。
+- 完整用法（属性、命令、验证、Messenger、DI 集成）见 `mvvm-communitytoolkit.md`。
 
 ## 常见错误
 
