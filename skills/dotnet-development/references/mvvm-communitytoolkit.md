@@ -6,18 +6,22 @@
 
 ## 1. 前置要求（最低版本）
 
-| 项 | 最低要求 | 说明 |
-|----|---------|------|
-| 包 | `CommunityToolkit.Mvvm` **8.4+** | 偏属性支持自 8.4 起 |
-| 语言 | **C# 14+** | 生成代码用到 `field` 关键字，C# 14 起稳定支持；C# 13 稳定版不支持（会报 `MVVMTK0041` / `CS9248`） |
-| 注意 | `latest` 随 SDK 浮动 | 只有所用 SDK 的 latest ≥ C# 14（即 .NET 10 SDK）时才满足最低要求 |
+> 环境基线：**假定 .NET 10 SDK 及以上**（`latest` = C# 14 稳定版）。此前提下**不需要** `preview`，也不 pin 具体 LangVersion；唯一实际约束是**包版本**。
+
+| 项 | 要求 | 说明 |
+|----|------|------|
+| 包 | `CommunityToolkit.Mvvm` **8.4.1+**（当前 8.4.2） | **关键项**：偏属性写法自 8.4 起，但 **8.4.0 即使在 C# 14 下也会报 `MVVMTK0041` / `CS9248`**；8.4.1 起迁移到 Roslyn 5.0，才在 C# 14 下开箱即用 |
+| SDK | **.NET 10+** | 环境基线。`latest` = C# 14（`field` 关键字已稳定）；partial property 语法本身是 C# 13 |
+| LangVersion | 无需 `preview`，也无需 pin | TFM ≥ net10.0 时默认即 C# 14，可省略；**TFM 更低（如 net8.0）时写 `latest`** 以拿到 C# 14 |
+| TFM | 不限 | 门槛是「SDK + 包版本」，与目标框架无关。**不要**因为 TFM 不是 .NET 10 就退回手写 `INotifyPropertyChanged` |
 
 ```xml
 <PropertyGroup>
+  <!-- TFM ≥ net10.0 时可省略；更低 TFM（如 net8.0）用 latest 拿到 C# 14。不需要 preview -->
   <LangVersion>latest</LangVersion>
 </PropertyGroup>
 <ItemGroup>
-  <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.1" />
+  <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
   <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
 </ItemGroup>
 ```
@@ -190,11 +194,12 @@ builder.Services.AddSingleton<MainWindow>();
 - VM 通过**构造函数**接收服务、子 VM 与 `IMessenger`；不要在 VM 里 `new` 服务。
 - **禁止 `CommunityToolkit.Mvvm.DependencyInjection.Ioc.Default`** 作为常规取依赖方式（等价于 Service Locator）；仅设计时数据等无法构造注入的逃生场景可用。
 - 窗口/页面通过构造函数注入 VM，在隐藏代码里设置 `DataContext`。
+- **code-behind 的允许清单只有三条**：`InitializeComponent`、设置 `DataContext`、纯视图初始化（焦点 / 动画 / 窗口行为）；**不得**承载业务逻辑、状态联动、模型改动——视图事件一律转成命令或绑定。
 
 ## 8. 常见错误
 
 1. **用旧字段式 `[ObservableProperty]`**：新代码一律用 `public partial` 属性写法（字段式会静默丢序列化字段，见上）。
-2. **包版本 < 8.4 / 语言版本不足**：不支持 partial property 写法；语言版本需 C# 14 或更高。
+2. **包版本 < 8.4.1 / 环境过旧**：不支持 partial property 写法。需 **.NET 10 SDK+ 与 `CommunityToolkit.Mvvm` 8.4.1+**（8.4.0 即使在 C# 14 下也报 `MVVMTK0041` / `CS9248`）。**这是「SDK + 包版本」门槛，不是 TFM 门槛**——别因项目 TFM 不是 .NET 10 就退回手写通知。
 3. **在 VM 里 `new` 服务或 `Ioc.Default.GetService`**：隐藏依赖、破坏可测性。
 4. **每文档/每次打开的 VM 注册成 `Singleton`**：状态串味、关闭后再打开报错。
 5. **`CanExecute` 忘了失效**：属性变化后用 `[NotifyCanExecuteChangedFor]` 或 `NotifyCanExecuteChanged()`。

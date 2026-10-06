@@ -165,6 +165,8 @@ public sealed class SyncWorker(IServiceScopeFactory scopes, ILogger<SyncWorker> 
 
 ## MVVM 要点（CommunityToolkit.Mvvm 8.4+，强制）
 
+> ⚠️ **本节只是摘录速查，不完整。** 任何 ViewModel / 数据绑定 / `ICommand` 改动都必须读 `mvvm-communitytoolkit.md`（全部特性、参数、版本要求）——本节覆盖不到 `[NotifyPropertyChangedFor]`、`CanExecute` 刷新细节、Messenger 用法、版本/语言门槛等，**读过本节不等于读过 MVVM 规范**。
+
 - ViewModel 通过**构造函数**接收服务、子 VM 与 `IMessenger`；不要 `new` 服务，不要用 `Ioc.Default.GetService` 隐藏依赖。
 - 属性一律用 `[ObservableProperty]` 的 **partial property 新写法**；禁止手写 `INotifyPropertyChanged`，禁止旧字段写法：
 
@@ -172,8 +174,11 @@ public sealed class SyncWorker(IServiceScopeFactory scopes, ILogger<SyncWorker> 
   public sealed partial class MainViewModel : ObservableObject
   {
       [ObservableProperty]
+      [NotifyPropertyChangedFor(nameof(Summary))]
       [NotifyCanExecuteChangedFor(nameof(RefreshCommand))]
       public partial bool IsBusy { get; set; }
+
+      public string Summary => IsBusy ? "加载中…" : "就绪";
   }
   ```
 
