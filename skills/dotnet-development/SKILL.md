@@ -19,7 +19,7 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 
 - **DI 容器**：一律 **Microsoft.Extensions.DependencyInjection**（经 `Host.CreateApplicationBuilder` / `Host.CreateDefaultBuilder` 或 `ServiceCollection`）；**不引入** Autofac / Unity / Prism 等第三方容器，也不自研容器。
 - **基础设施**：优先 **Microsoft.Extensions.\*** 官方包——`Hosting`、`Configuration.*`、`Options.*`、`Logging.*`、`Http`（`IHttpClientFactory`）、`Http.Resilience`、`Caching.*`、`DependencyInjection`。日志、配置、HTTP、缓存、健康检查都走这些抽象。
-- **MVVM**：一律 **CommunityToolkit.Mvvm（8.4.1+，当前 8.4.2；8.4.0 在 C# 14 下也会报 `MVVMTK0041`/`CS9248`）**；`[ObservableProperty]` **必须**用 partial property 新写法 `public partial string? Name { get; set; }`，**禁止**旧字段式 `private string? _name;`。环境基线 **.NET 10+**（C# 14），无需 `preview`；详见 `references/mvvm-communitytoolkit.md`。
+- **MVVM**：一律 **CommunityToolkit.Mvvm（最低 8.4.1）**，环境最低 **.NET 10**；`[ObservableProperty]` **必须**用 partial property 新写法 `public partial string? Name { get; set; }`，**禁止**旧字段式 `private string? _name;`。详见 `references/mvvm-communitytoolkit.md`。
 - **时间/测试**：时间用 `TimeProvider`；测试用 `Microsoft.Extensions.TimeProvider.Testing`。
 
 ## When to Use

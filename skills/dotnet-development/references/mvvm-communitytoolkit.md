@@ -6,25 +6,10 @@
 
 ## 1. 前置要求（最低版本）
 
-> 环境基线：**假定 .NET 10 SDK 及以上**（`latest` = C# 14 稳定版）。此前提下**不需要** `preview`，也不 pin 具体 LangVersion；唯一实际约束是**包版本**。
-
-| 项 | 要求 | 说明 |
-|----|------|------|
-| 包 | `CommunityToolkit.Mvvm` **8.4.1+**（当前 8.4.2） | **关键项**：偏属性写法自 8.4 起，但 **8.4.0 即使在 C# 14 下也会报 `MVVMTK0041` / `CS9248`**；8.4.1 起迁移到 Roslyn 5.0，才在 C# 14 下开箱即用 |
-| SDK | **.NET 10+** | 环境基线。`latest` = C# 14（`field` 关键字已稳定）；partial property 语法本身是 C# 13 |
-| LangVersion | 无需 `preview`，也无需 pin | TFM ≥ net10.0 时默认即 C# 14，可省略；**TFM 更低（如 net8.0）时写 `latest`** 以拿到 C# 14 |
-| TFM | 不限 | 门槛是「SDK + 包版本」，与目标框架无关。**不要**因为 TFM 不是 .NET 10 就退回手写 `INotifyPropertyChanged` |
-
-```xml
-<PropertyGroup>
-  <!-- TFM ≥ net10.0 时可省略；更低 TFM（如 net8.0）用 latest 拿到 C# 14。不需要 preview -->
-  <LangVersion>latest</LangVersion>
-</PropertyGroup>
-<ItemGroup>
-  <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
-  <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
-</ItemGroup>
-```
+| 项 | 最低版本 |
+|----|---------|
+| `CommunityToolkit.Mvvm` | **8.4.1** |
+| .NET | **10** |
 
 ## 2. 三个基类怎么选
 
@@ -199,7 +184,7 @@ builder.Services.AddSingleton<MainWindow>();
 ## 8. 常见错误
 
 1. **用旧字段式 `[ObservableProperty]`**：新代码一律用 `public partial` 属性写法（字段式会静默丢序列化字段，见上）。
-2. **包版本 < 8.4.1 / 环境过旧**：不支持 partial property 写法。需 **.NET 10 SDK+ 与 `CommunityToolkit.Mvvm` 8.4.1+**（8.4.0 即使在 C# 14 下也报 `MVVMTK0041` / `CS9248`）。**这是「SDK + 包版本」门槛，不是 TFM 门槛**——别因项目 TFM 不是 .NET 10 就退回手写通知。
+2. **包版本低于 8.4.1 / .NET 低于 10**：不支持 partial property 写法 → 升到最低版本；**别退回手写 `INotifyPropertyChanged`**。
 3. **在 VM 里 `new` 服务或 `Ioc.Default.GetService`**：隐藏依赖、破坏可测性。
 4. **每文档/每次打开的 VM 注册成 `Singleton`**：状态串味、关闭后再打开报错。
 5. **`CanExecute` 忘了失效**：属性变化后用 `[NotifyCanExecuteChangedFor]` 或 `NotifyCanExecuteChanged()`。
