@@ -21,17 +21,30 @@ if command -v cygpath >/dev/null 2>&1; then
   DEST="$(cygpath -u "$DEST")"
 fi
 
+# ---- 颜色：默认仅输出到终端时启用；FORCE_COLOR 强制开、NO_COLOR/重定向/TERM=dumb 自动关 ----
+use_color=0
+if [ -n "${FORCE_COLOR:-}" ]; then
+  use_color=1
+elif [ -t 1 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-}" != dumb ]; then
+  use_color=1
+fi
+if [ "$use_color" -eq 1 ]; then
+  C_RESET=$'\033[0m'; C_GREEN=$'\033[32m'; C_YELLOW=$'\033[33m'
+else
+  C_RESET=''; C_GREEN=''; C_YELLOW=''
+fi
+
 if [ -e "$DEST" ]; then
   rm -rf "$DEST"
-  echo "✓ 已卸载 $DEST"
+  echo "${C_GREEN}✓ 已卸载 $DEST${C_RESET}"
 else
-  echo "- 未找到 $DEST，无需卸载"
+  echo "${C_YELLOW}- 未找到 $DEST，无需卸载${C_RESET}"
 fi
 # 清理安装/更新异常中断（kill -9/断电）可能残留的临时目录（正常结束不留，此处兜底）
 shopt -s nullglob
 STALE=("$DEST".new-* "$DEST".old-*)
 if [ "${#STALE[@]}" -gt 0 ]; then
   rm -rf "${STALE[@]}"
-  echo "✓ 已清理 ${#STALE[@]} 个残留临时目录"
+  echo "${C_GREEN}✓ 已清理 ${#STALE[@]} 个残留临时目录${C_RESET}"
 fi
 shopt -u nullglob

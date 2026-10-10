@@ -46,6 +46,20 @@ COUNT="${#SKILL_FILES[@]}"
 shopt -u globstar nullglob
 [ "$COUNT" -gt 0 ] || { echo '构建结果无 SKILL.md，终止安装（目标目录未动）' >&2; exit 1; }
 
+# ---- 颜色：默认仅输出到终端时启用；FORCE_COLOR 强制开、NO_COLOR/重定向/TERM=dumb 自动关（不污染日志）----
+use_color=0
+if [ -n "${FORCE_COLOR:-}" ]; then
+  use_color=1
+elif [ -t 1 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-}" != dumb ]; then
+  use_color=1
+fi
+if [ "$use_color" -eq 1 ]; then
+  C_RESET=$'\033[0m'; C_BOLD=$'\033[1m'; C_DIM=$'\033[2m'
+  C_GREEN=$'\033[32m'; C_YELLOW=$'\033[33m'; C_RED=$'\033[31m'
+else
+  C_RESET=''; C_BOLD=''; C_DIM=''; C_GREEN=''; C_YELLOW=''; C_RED=''
+fi
+
 # ---- 对比新旧，逐技能得出真实状态（新增 / 更新 / 移除 / 未变），不再一律显示"已安装" ----
 # 技能键 = SKILL.md 相对技能根的目录路径（如 github-actions、obra-superpowers/writing-skills）
 skill_key() { local p="${2#"$1"/}"; printf '%s' "${p%/SKILL.md}"; }
@@ -81,17 +95,23 @@ if [ "${#OLD_SKILL_MD[@]}" -gt 0 ]; then
   done
 fi
 
-echo "== 技能状态（目标：$DEST）=="
-if [ "${#ADDED[@]}" -gt 0 ]; then printf '  + 新增  %s\n' "${ADDED[@]}"; fi
-if [ "${#UPDATED[@]}" -gt 0 ]; then printf '  ↑ 更新  %s\n' "${UPDATED[@]}"; fi
-if [ "${#REMOVED[@]}" -gt 0 ]; then printf '  - 移除  %s\n' "${REMOVED[@]}"; fi
-printf '  = 未变  %s 个\n' "${#UNCHANGED[@]}"
+echo "${C_BOLD}== 技能状态（目标：$DEST）==${C_RESET}"
+if [ "${#ADDED[@]}" -gt 0 ]; then
+  for k in "${ADDED[@]}"; do echo "  ${C_GREEN}+ 新增${C_RESET}  $k"; done
+fi
+if [ "${#UPDATED[@]}" -gt 0 ]; then
+  for k in "${UPDATED[@]}"; do echo "  ${C_YELLOW}↑ 更新${C_RESET}  $k"; done
+fi
+if [ "${#REMOVED[@]}" -gt 0 ]; then
+  for k in "${REMOVED[@]}"; do echo "  ${C_RED}- 移除${C_RESET}  $k"; done
+fi
+printf '  %s= 未变%s  %s 个\n' "$C_DIM" "$C_RESET" "${#UNCHANGED[@]}"
 printf '共 %s 个技能：新增 %s / 更新 %s / 移除 %s / 未变 %s\n' \
   "$COUNT" "${#ADDED[@]}" "${#UPDATED[@]}" "${#REMOVED[@]}" "${#UNCHANGED[@]}"
 
 # 完全无变化：不做原子替换（不动时间戳），如实报告
 if [ "${#ADDED[@]}" -eq 0 ] && [ "${#UPDATED[@]}" -eq 0 ] && [ "${#REMOVED[@]}" -eq 0 ]; then
-  echo "✓ 已是最新，无变化（共 $COUNT 个技能）"
+  echo "${C_GREEN}✓ 已是最新，无变化（共 $COUNT 个技能）${C_RESET}"
   exit 0   # trap 负责清理 $TMP 与 $STAGING
 fi
 
@@ -111,7 +131,7 @@ fi
 trap - EXIT
 rm -rf "$TMP"
 if [ "$FRESH" -eq 1 ]; then
-  echo "✓ 安装完成：共 $COUNT 个技能（全部新增）→ $DEST"
+  echo "${C_GREEN}✓ 安装完成：共 $COUNT 个技能（全部新增）→ $DEST${C_RESET}"
 else
-  echo "✓ 更新完成：新增 ${#ADDED[@]} / 更新 ${#UPDATED[@]} / 移除 ${#REMOVED[@]}（共 $COUNT 个技能）→ $DEST"
+  echo "${C_GREEN}✓ 更新完成：新增 ${#ADDED[@]} / 更新 ${#UPDATED[@]} / 移除 ${#REMOVED[@]}（共 $COUNT 个技能）→ $DEST${C_RESET}"
 fi
