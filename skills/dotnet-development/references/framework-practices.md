@@ -64,6 +64,8 @@ builder.Services.AddOptions<OrderApiOptions>()
 
 `IOptions<T>.Value` 是启动时冻结的快照；需要热更新时用 Snapshot/Monitor。
 
+**Options 属于应用级装配层**：进程级、随应用装配、全应用共享，**与用户侧设置无关，与 MVVM 无关**——用户可编辑的设置由可通知的配置模型承载，不要塞进 Options。
+
 ## 3. 日志（结构化 + `ILogger<T>`）
 
 ```csharp
