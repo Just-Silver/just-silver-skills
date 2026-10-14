@@ -104,6 +104,8 @@ private bool CanSave() => !IsBusy;
 
 命名规则：去掉 `On` 前缀、去掉 `Async` 后缀，再追加 `Command`。
 
+> **命令体只做「取输入 → 调一个具名用例 → 按结果翻成提示与状态」。** 保存→上传→关联这类跨多个协作者的顺序编排不属于命令：写在这里的流程会被复制进每个命令，VM 随之膨胀（归属见 `design-principles.md` 的「跨对象的协作编排」）。
+
 ## 4. 验证（`ObservableValidator`）
 
 ```csharp
@@ -180,6 +182,7 @@ builder.Services.AddSingleton<MainWindow>();
 2. **在 VM 里 `new` 服务或 `Ioc.Default.GetService`**：隐藏依赖、破坏可测性。
 3. **每文档/每次打开的 VM 注册成 `Singleton`**：状态串味、关闭后再打开报错。
 4. **`CanExecute` 忘了失效**：属性变化后用 `[NotifyCanExecuteChangedFor]` 或 `NotifyCanExecuteChanged()`。
+5. **在命令里按顺序拼多个服务**（保存 → 上传 → 关联…）：VM 因此拿到一堆依赖并逐行膨胀，流程也被复制到下一个 vm —— 抽成应用层的具名用例，命令只调它一次。
 
 ## 8. 参考
 
