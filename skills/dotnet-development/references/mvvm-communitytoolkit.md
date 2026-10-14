@@ -39,6 +39,7 @@ partial void OnAgeChanging(int oldValue, int newValue) { /* 变更前，可访�
 要点：
 - 初始化直接在偏属性声明上写即可：`public partial string Name { get; set; } = string.Empty;`。
 - 校验特性、`[NotifyPropertyChangedFor]` 等**直接写在属性上**。
+- **版本前提**：`LangVersion` 需 ≥ C# 14（`net10.0` 默认满足；`net9.0` 需显式 `<LangVersion>preview</LangVersion>`），CommunityToolkit.Mvvm 用 **≥ 8.4.1**（实测 `net10.0` 下 8.4.0 不生成实现、编译报 `CS9248`）。
 
 ### ❌ 禁止旧字段写法
 
