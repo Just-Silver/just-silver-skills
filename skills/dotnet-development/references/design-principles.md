@@ -60,7 +60,7 @@ await fileStorage.UploadAsync(path, ct);
 await submitOrder.SubmitAsync(draft, ct);
 ```
 
-**例外**：单服务的一次转发，没有顺序、条件与失败口径的，不该为它包一层。
+**例外**：**同一职责**的一次转发（没有顺序、条件与失败口径的）不该为它包一层；跨多个协作者的编排不是这种转发。
 
 ## DI 与依赖管理
 
