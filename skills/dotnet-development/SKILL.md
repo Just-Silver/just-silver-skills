@@ -1,9 +1,30 @@
 ---
 name: dotnet-development
-description: Use when writing, modifying, or reviewing C# / .NET code in any project type (ASP.NET Core, WPF, WinForms, Avalonia, MAUI, Blazor, console, worker, class library) — designing classes and services, registering or resolving dependencies, choosing service lifetimes, structuring modules/layers, building MVVM ViewModels with CommunityToolkit.Mvvm, deciding whether an abstraction, interface, or design pattern is warranted, or when about to introduce a service locator, hidden dependency, god class, or abstraction "for architecture's sake" — also use when about to hand-write INotifyPropertyChanged, an ICommand, or manual property-change UI wiring instead of the CommunityToolkit.Mvvm source generators.
+description: Use when writing, modifying, or reviewing C# / .NET code in any project type (ASP.NET Core, WPF, WinForms, Avalonia, MAUI, Blazor, console, worker, class library) — designing classes and services, registering or resolving dependencies, choosing service lifetimes, or diagnosing memory/handle growth in long-running or background services, structuring modules/layers, building MVVM ViewModels with CommunityToolkit.Mvvm, deciding whether an abstraction, interface, or design pattern is warranted, or when about to introduce a service locator, hidden dependency, god class, or abstraction "for architecture's sake" — also use when about to hand-write INotifyPropertyChanged, an ICommand, or manual property-change UI wiring instead of the CommunityToolkit.Mvvm source generators.
 ---
 
 # .NET 开发规范
+
+---
+
+# 🛑 开发红区 —— 写代码前先读，命中即停
+
+> **本节优先级高于本文档其余一切内容。** 以下问题会**静默**毁掉生产（内存/句柄只增不减、数据错乱、进程崩溃），而**编译器、`ValidateScopes`、常规工具、日常代码审查全都发现不了**——只有上线运行数周/数月后才爆。
+>
+> **命中任意一条：立刻停下来修，不要继续往下写。** 下列理由一律无效：「能跑就行」·「应该没事」·「我手动 `Dispose` 了」·「开了 `ValidateScopes`」·「已经跑了几个月都正常」。
+
+| # | 红线 | 为什么致命（静默） |
+|---|------|-------------------|
+| **1** | **从根容器反复解析实现 `IDisposable` 的瞬态对象**（`Singleton` 注入 `IServiceProvider`，在循环 / `Timer` 回调 / 后台服务里 `GetRequiredService`） | 实例被容器**强引用到进程退出**，内存/句柄只增不减。**手动 `Dispose()`、改成工厂注册、`ValidateScopes`/`ValidateOnBuild` 全都救不了**（三条均已实测）。官方原话：**不要用 `Transient` 注册 `IDisposable`** |
+| **2** | **`catch (Exception) { }` 静默吞异常** | 故障被掩盖、日志无痕，最终在无关的地方以无关的形态爆发 |
+| **3** | **`.Result` / `.Wait()` / `async void`** | 死锁与进程崩溃，通常只在生产并发下才露出（`async void` 仅框架回调 / `override` 这类签名不可改处例外） |
+| **4** | **`HttpClient` 用错**：长期持有却不设 `PooledConnectionLifetime`，或频繁 `new` | DNS 不更新 / 端口耗尽，延迟数小时至数天才爆 |
+
+**红线 1 的官方解法**：**不要用 `Transient` 注册 `IDisposable`**，二选一——让每轮 / 每批工作单元拥有一个**会被释放的 scope**（`IServiceScopeFactory.CreateAsyncScope()`），或用**工厂模式**由消费者释放（`AddTransient(sp => new X())` **不算**工厂模式，仍被追踪）。完整机制、实测数据与逐条改法见 `references/framework-practices.md`「🔴 可释放瞬态被容器强引用」——**命中红线 1 时必须去读它**。
+
+> 本文档下方「其余反模式」表**不重复**本节条目，只收录不会静默致命的耦合/过度设计问题。
+
+---
 
 ## Overview
 
@@ -21,6 +42,7 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 - **基础设施**：优先 **Microsoft.Extensions.\*** 官方包——`Hosting`、`Configuration.*`、`Options.*`、`Logging.*`、`Http`（`IHttpClientFactory`）、`Http.Resilience`、`Caching.*`、`DependencyInjection`。日志、配置、HTTP、缓存、健康检查都走这些抽象。
 - **MVVM**：一律 **CommunityToolkit.Mvvm**；`[ObservableProperty]` **必须**用 partial property 新写法 `public partial string? Name { get; set; }`，**禁止**旧字段式 `private string? _name;`。详见 `references/mvvm-communitytoolkit.md`。
 - **时间/测试**：时间用 `TimeProvider`；测试用 `Microsoft.Extensions.TimeProvider.Testing`。
+- **服务生命周期**：按**需求**选，不是按偏好——多数容器默认 `Transient`；`Singleton` 的正当理由是「全局共享」或「创建昂贵」（**不要无理由地给无状态服务用 `Singleton`**）；**可释放对象必须有释放边界**（见红区 1 与 `references/framework-practices.md` 第 1 节「DI 生命周期」及其下「可释放对象（`IDisposable`）的归宿」）。
 
 ## When to Use
 
@@ -58,7 +80,9 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 
 > 本表只做索引，防止“不知道该用哪个特性”这类漏读；签名、参数、约束与版本要求一律以 `references/mvvm-communitytoolkit.md` 为准。
 
-## 硬性红线（命中即改，不要自我辩解）
+## 其余反模式（命中即改，不要自我辩解）
+
+> 红区 4 条见文首「🛑 开发红区」，此处**不重复**。本表收录的是**不会静默致命**的耦合与过度设计问题。
 
 | 反模式 | 为什么错 | 改法 |
 |--------|----------|------|
@@ -74,12 +98,9 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 | 万能类：`XxxManager` / `XxxHelper` / `XxxUtil` / 超长 `Service` | 职责发散，一个类多个变化原因 | 按职责拆分，让行为回到所属对象 |
 | 每个类都造 `IXxx` + `Xxx` | 只为“像 DI”而加文件，无替换价值 | 只在真实边界/可替换/可测试处抽接口 |
 | 为架构而架构：无实际用途的 `Factory`/`Handler`/`Wrapper`/`BaseService`/`Repository` 层 | 增加跳转层级与维护成本，收益为零 | 简单实现能解决就不加中间层；出现第二实现/变化点再加 |
-| `Singleton` 捕获 `Scoped`/`Transient` 依赖（captive dependency） | 短生命周期被提升为单例，串请求状态 | 按实际生命周期注册；开发环境开 `ValidateScopes`/`ValidateOnBuild` |
+| `Singleton` 捕获 `Scoped`/`Transient` 依赖（captive dependency） | 短生命周期被提升为单例，串请求状态 | 按实际生命周期注册；开发环境开 `ValidateScopes`/`ValidateOnBuild`。**注意**：捕获 Scoped 会被校验抓到（不静默）；但若被捕获的是可释放 Transient，则校验抓不到 → 属红区 1 |
 | `Console.WriteLine` / 直接依赖具体日志实现 | 无结构、无法分级过滤、业务耦合基础设施 | 注入 `ILogger<T>`，结构化日志 |
 | `Environment.GetEnvironmentVariable` 散读配置 | 魔法字符串、无校验、无法热更新 | Options 强类型绑定 + 校验 |
-| `new HttpClient()`、`HttpClient` 当字段长期持有而不设 `PooledConnectionLifetime` | 端口耗尽 / DNS 不更新 | `IHttpClientFactory` typed client（或长生命周期 client + `PooledConnectionLifetime`） |
-| `try { } catch (Exception) { }` 静默吞异常；无意义 `catch` 后重包；每层 `catch`+记日志+`throw` 重复记录 | 掩盖故障、丢失原始信息、日志噪音 | 只捕获能处理的；否则继续抛出；必要时补上下文并保留 `InnerException`；异常只在**能处理或需补上下文**的层记录一次 |
-| `.Result` / `.Wait()` / `async void`（事件处理器、框架回调/override 除外） | 死锁、异常语义丢失 | `async/await` 全程；`async Task` + `CancellationToken` |
 
 > **Service Locator 的例外**：组合根 / 框架适配层（无法构造函数注入，如应用基类按运行时类型解析主窗口、导航按类型解析页面）可持有 `IServiceProvider`，但**必须在 XML 注释写明理由**；业务代码仍一律禁止（构造函数注入 / 抽象工厂 / 策略）。
 
@@ -100,6 +121,7 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 - [ ] 有本该属于对象、却被塞进外部 Service 的业务逻辑？
 - [ ] 有为了模式而模式的抽象层（无第二实现、无变化点）？
 - [ ] 生命周期选择是否与依赖生命周期匹配？有无 captive dependency？
+- [ ] 循环 / `Timer` / 后台服务里，是否从根容器解析了实现 `IDisposable` 的瞬态对象？（会被强引用到进程退出；手动 `Dispose` 与 `ValidateScopes` 都救不了）
 - [ ] 外部依赖（DB/HTTP/时间/文件）是否可替换、可单测？
 - [ ] 异常是否被真正处理或向上抛出，而非静默吞掉？
 - [ ] 配置走 Options、日志走 `ILogger<T>` 了吗？

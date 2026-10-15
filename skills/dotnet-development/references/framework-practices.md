@@ -8,10 +8,35 @@
 | 生命周期 | 注册 | 实例 | 典型用途 |
 |----------|------|------|----------|
 | Transient | `AddTransient` | 每次解析都新建 | 无状态、轻量、短命 |
-| Scoped | `AddScoped` | 每个 scope 一个（Web 每请求） | `DbContext`、请求级状态 |
-| Singleton | `AddSingleton` | 全应用一个 | 无状态共享服务、缓存、配置 |
+| Scoped | `AddScoped` | 每个 scope 一个（Web 每请求） | `DbContext`、工作单元/请求级状态 |
+| Singleton | `AddSingleton` | 全应用一个 | 全局共享的服务、创建昂贵的对象、缓存、配置 |
 
 选择依据**实际生命周期与线程安全要求**，不要为省实例而无脑 Singleton。Singleton 必须线程安全。
+
+### 怎么选（需求驱动，不是偏好）
+
+官方口径（guidelines）：**多数容器把 `Transient` 作为默认作用域**；`Singleton` 的正当理由是「**全局共享**」或「**创建昂贵**」——官方提醒**不要无理由地给无状态服务加 `Singleton`**，但**全局共享的无状态服务**用 `Singleton` 是常见做法（官方 service-lifetimes 亦言「Singleton 常用于无状态服务」）。所以**不要问「默认用哪个」，按需求选**：
+
+1. **会不会同时存在多份？** 会 → 就不能是 `Singleton`。
+2. **谁需要共享同一份？** 共享同一份 → `Scoped`/`Singleton`；各持独立一份 → `Transient`。
+3. **实现 `IDisposable` 时，谁负责释放？** 必须能指出释放边界 → 见下节。
+
+> `Scoped` 的「一个 scope」是什么，由**应用决定边界**：Web 是每请求；桌面就是每个窗口 / 每个对话框 / 每次操作——**须自己 `CreateScope()`**（桌面运行时**不会**替你自动开，不同于 ASP.NET 每请求自动开）。
+
+### 可释放对象（`IDisposable`）的归宿
+
+官方硬规则：**不要用 `Transient` 注册 `IDisposable`**；**不要从根容器解析 `Transient`/`Scoped` 的 `IDisposable`**。可释放对象必须有**会被释放的边界**：
+
+| 归宿 | 谁释放 | 何时用（官方按**场景**给方案，无优先级排序） |
+|------|--------|--------|
+| 工厂（`new` / `ActivatorUtilities.CreateInstance`） | **调用方**（`using`） | 官方「瞬态、有限生命周期」场景：需要新实例、且用后即释放 |
+| `Scoped` + 每单元 `CreateScope()` | scope（自动） | 官方「共享实例、有限生命周期」场景：同一工作单元内共享，且随 scope 结束释放 |
+| `Singleton` | 容器（关机时一次） | 全局共享、创建昂贵、且线程安全 |
+| ~~`Transient`（从根/长命 scope 解析）~~ | ❌ 无边界 → 泄漏 | **禁止**（见「🔴 可释放瞬态被容器强引用」） |
+
+> ⚠️ 官方另有规则：**接收方不要手动 `Dispose` 由容器解析出来的依赖**（官方原话「The receiver of the IDisposable dependency shouldn't call Dispose on that dependency」）。**可释放对象若由容器拥有，就交给容器释放**；只有**工厂模式**（容器不拥有）才由调用方 `using`。两者混用 = 二次释放。
+
+> `IServiceScopeFactory` **始终注册为 Singleton**（官方：always registered as a singleton），任何用了 DI 的应用都能直接注入；scope 的**创建时机与边界由你决定**。
 
 ### captive dependency（头号坑）
 
@@ -25,6 +50,7 @@ services.AddScoped<IRepository, EfRepository>();
 
 - 真正要避免的是 **Singleton 捕获 Scoped**（如 `IOptionsSnapshot`、`DbContext`）——开发环境 `ValidateScopes`/`ValidateOnBuild` 会直接报错。
 - Singleton 依赖 Transient 是**允许**的，但该 Transient 会被提升为单例生命周期、**必须线程安全**。
+- **但若该 Transient 实现 `IDisposable`/`IAsyncDisposable`，规则完全不同**——见下节，`ValidateScopes` **拦不住**这种情况。
 - `IOptions`/`IOptionsMonitor`/`ILogger` 都是 Singleton，可安全注入任何生命周期。
 - **typed client（`AddHttpClient<T>`）是 Transient**，不要被 Singleton 捕获（见第 4 节）。
 
@@ -33,6 +59,102 @@ services.AddScoped<IRepository, EfRepository>();
 - ASP.NET Core / Generic Host 在开发环境默认开 `ValidateScopes`、`ValidateOnBuild`，会启动即抛“Cannot consume scoped service from singleton”。
 - 手动 `BuildServiceProvider` 时显式传 `new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true }`。
 - 排查“无法解析 X while attempting to activate Y”：注册顺序、生命周期、构造函数歧义（多个可解析构造函数会抛异常）。
+
+### 🔴 可释放瞬态被容器强引用（隐形泄漏 · 红区）
+
+> **这是红区，不是建议。** 命中即停手改正，不要用下列理由放行——每一条都已在本机实测推翻：
+
+| 你的辩解 | 实测事实 |
+|---|---|
+| 「我在循环里 `using` 了，没漏」 | 实例仍被根容器**强引用**，20 万次解析后堆增长 **206 MB**；`using` 只释放资源，**不摘引用** |
+| 「我把 `Dispose` 写好了」 | 容器在 scope 释放时会**再 `Dispose` 一次**——你的用法变成**二次释放** |
+| 「我改成工厂注册绕开追踪」 | `AddTransient(sp => new X())` **照样被追踪**（实测堆增长 103 MB） |
+| 「开发环境开了 `ValidateScopes`」 | 只校验 `Scoped`；从根容器解析 Transient **完全静默**（实测无异常） |
+| 「跑了几个月都正常」 | 泄漏是**线性累积**：1 次/秒 ≈ 每天 8.6 万个永不回收的对象，崩溃只是时间问题 |
+
+**规则：容器会强引用它创建的每一个 `IDisposable`/`IAsyncDisposable` 实例，直到「拥有它的那个 scope」被释放。** 根容器（root provider）本身就是一个 scope，活到进程退出——所以**从根容器解析可释放瞬态 = 内存只增不减**。
+
+三点反直觉，务必记住：
+
+- **每个实例被永久钉在堆上**：托管内存随解析次数无界增长（句柄另算）。
+- **手动 `Dispose()` 救不了**：`Dispose` 只释放该实例自己的资源，**不会**把它从容器的追踪列表里摘掉；它反而会**二次释放**（容器在 scope 释放时再 `Dispose` 一次）。
+- **`ValidateScopes` / `ValidateOnBuild` 拦不住**：它们只校验 **Scoped** 的捕获式依赖，对「从根容器解析 Transient」完全静默。官方 guidelines 也明说：**不要用 Transient 生命周期注册 `IDisposable`**。
+
+典型触发点（都长得很正常）：
+
+```csharp
+// ❌ Singleton 里注入 IServiceProvider（= 根容器），每次循环都解析一个可释放瞬态
+public sealed class PollingService(IServiceProvider provider) : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            using var session = provider.GetRequiredService<PlcSession>(); // PlcSession : IDisposable
+            await session.PollAsync(ct);   // 每秒泄漏一个，ValidateScopes 全程无感
+            await Task.Delay(1000, ct);
+        }
+    }
+}
+```
+
+改法（**官方正面回答是：不要用 `Transient` 注册 `IDisposable`**，然后二选一——`Scoped` 走 scope，或工厂模式由消费者释放）：
+
+1. **开一个 scope，把工作单元关进去**：
+
+   ```csharp
+   public sealed class PollingService(IServiceScopeFactory scopes) : BackgroundService
+   {
+       protected override async Task ExecuteAsync(CancellationToken ct)
+       {
+           using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+           while (await timer.WaitForNextTickAsync(ct))
+           {
+               await using var scope = scopes.CreateAsyncScope();   // 每轮一个 scope
+               var session = scope.ServiceProvider.GetRequiredService<PlcSession>();
+               await session.PollAsync(ct);
+               // 不要再自己 using session：交给 scope，避免二次释放
+           }
+       }
+   }
+   ```
+
+   - `IServiceScopeFactory` 由容器自动提供，**无需注册**；Singleton 里**只注入它**，不要注入 `IServiceProvider` 当定位器。
+   - 这是官方教程「Use scoped services within a BackgroundService」与官方 overview 的范本写法。
+
+> ⚠️ `CreateScope()` 只在**每轮/每批**创建时才有效。把 scope 建在长循环**外面**，等于换成另一个长命 scope，照样累积。
+
+2. **提升为 `Scoped`**：若「一个工作单元一个实例」正是语义，直接注册 `AddScoped`——既表达意图，又让 `ValidateScopes`/`ValidateOnBuild` 重新生效（误注入 Singleton 会**启动即报错**）。**能用 `Scoped` 就不要用 `Transient`**，这是最省心的护栏。
+
+3. **工厂模式**（官方对「瞬态、有限生命周期」场景的正式方案）：**根本不注册**这个类型，改为注册一个**工厂**（单例），由它提供实例、由消费者负责释放——容器不认识这些实例，自然不追踪。**这是官方认可的解法，不是绕路**：
+
+   ```csharp
+   public sealed class PlcSessionFactory(IServiceProvider sp)   // 或注册为 static 工厂
+   {
+       public PlcSession Create() => new PlcSession();          // 无依赖时直接 new
+       // 有依赖时：ActivatorUtilities.CreateInstance<PlcSession>(sp) —— 官方推荐的工厂实现手段
+   }
+
+   services.AddSingleton<PlcSessionFactory>();
+   // 消费方：using var session = factory.Create();
+   ```
+
+   > 注意：`AddTransient(sp => new PlcSession())` **不是**工厂模式——它仍注册为 Transient，工厂创建的实例**照样被追踪**。
+
+4. 也可用 `ActivatorUtilities.CreateInstance<T>(sp)` 直接构造（容器不追踪），无需额外工厂类；代价是它**绕过 DI 校验**，依赖关系不如显式工厂清晰。
+
+### 权威来源（改写自官方原文，非二手结论）
+
+- 官方 guidelines「IDisposable guidance for transient and shared instances」：
+  - **Don't register `IDisposable` instances with a transient lifetime. Use the factory pattern instead.**
+  - **Don't resolve `IDisposable` instances with a transient or scoped lifetime in the root scope.**
+  - 官方对照两种改法：「瞬态、有限生命周期」→ 工厂模式（工厂可注入 `IServiceProvider`，用 `ActivatorUtilities.CreateInstance` 构造并自行释放）；「共享实例、有限生命周期」→ `Scoped` + `IServiceScopeFactory.CreateScope()`。
+  - 官方另有明确规则：**接收方不应手动 `Dispose` 由容器解析出来的依赖**（「The receiver of the IDisposable dependency shouldn't call Dispose on that dependency」）——即：**给了容器托管就不要再手动释放**，两者混用会造成二次释放。
+- 教程「Use scoped services within a BackgroundService」+ overview「Scope scenarios」：`BackgroundService` / `IHostedService` 用 `IServiceScopeFactory` + `CreateAsyncScope()`（官方两处均给出同一范本）。
+- 教程「Use the .NET Generic Host in a WPF app」：桌面推荐 `Host.CreateApplicationBuilder` + 去掉 `StartupUri` + `Startup`/`Exit` 挂接 + `_host.Services.GetRequiredService<MainWindow>()`。
+- API 文档 dotnet/runtime PR #124248（2026-02 合并）：`IServiceScopeFactory.CreateScope` 的 XML 注释补写「scope 释放时 **scoped 与 transient** 都会被释放」——即此歧义连官方 API 文档此前都未写清。
+
+**自检：** 只要有 `while` / `Timer` / `foreach` 循环里出现 `GetRequiredService<T>`，且 `T` 可能实现 `IDisposable`，就逐条问：这个实例归哪个 scope？scope 多久释放一次？
 
 ## 2. Options（强类型配置）
 
@@ -151,6 +273,7 @@ public sealed class OrderService
 ## 参考
 
 - Dependency injection guidelines — https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines
+  - 其中「IDisposable guidance for transient and shared instances」与「Disposable transient services captured by container」即上文红线依据
 - Service lifetimes — https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/service-lifetimes
 - Options pattern — https://learn.microsoft.com/dotnet/core/extensions/options
 - IHttpClientFactory — https://learn.microsoft.com/dotnet/core/extensions/httpclient-factory

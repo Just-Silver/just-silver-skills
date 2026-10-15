@@ -76,7 +76,7 @@ builder.Services.AddOptions<ApiOptions>()
     .ValidateOnStart();
 builder.Services.AddHttpClient<IApiClient, ApiClient>((sp, http) => { /* BaseAddress/Timeout */ });
 builder.Services.AddSingleton<IMessenger>(WeakReferenceMessenger.Default); // 跨 VM 通信
-builder.Services.AddSingleton<MainViewModel>();   // 主 VM 单例
+builder.Services.AddSingleton<MainViewModel>();   // 主 VM 单例（须满足下方「单例 VM 成立的前提」）
 builder.Services.AddTransient<DetailViewModel>(); // 每次打开新实例
 builder.Services.AddSingleton<MainWindow>();
 _host = builder.Build();
@@ -97,16 +97,27 @@ public partial class MainWindow : Window
 }
 ```
 
+> 官方示例用 XAML 的 `Startup="Application_Startup"` / `Exit="Application_Exit"` 事件挂接，与本文件 `override OnStartup/OnExit` 的做法等价（前者 XAML 挂事件、后者覆写方法，官方 how-to 用前者，两者都被官方文档使用）。
+
 ### 生命周期选择（桌面易错点）
+
+判据是**需求**（见 `framework-practices.md`「怎么选」），不是偏好。桌面**没有「框架自动开 scope」的时机**——但 `IServiceScopeFactory` 和 scope 机制与 Web **完全一样**（`IServiceScopeFactory` 始终是 Singleton，任何 DI 应用都能注入）。差别只在：Web 由框架**每请求自动开**，桌面要**你在边界上显式 `CreateScope()`**。
 
 | 对象 | 建议 | 说明 |
 |------|------|------|
 | 主窗口 / Shell VM | `Singleton` | 全应用一个 |
-| 次级窗口 / 每文档 VM | `Transient` | 每次打开新实例；用 Singleton 会导致关闭后再打开报“无法设置可见性/Show” |
-| 数据服务、设置、HTTP 客户端封装 | `Singleton`（除 typed client 外） | 无状态共享 |
+| 次级窗口 / 每文档 VM | `Transient` | **因为会同时存在多份**（不是「偏好瞬态」）；用 Singleton → 关闭后再打开报“无法设置可见性/Show”、多窗口共用一份状态（输入串味） |
+| 每窗口一份、且关闭即释放 | `Scoped` + **每窗口 `CreateScope()`** | 桌面的 scoped 边界 = 窗口 / 对话框生命周期；手工开 scope 并随窗口关闭而释放 |
+| 数据服务、设置、HTTP 客户端封装 | `Singleton` | 全局共享的服务（官方准则：**不要无理由地给无状态服务用 `Singleton`**；但「全局共享」正是单例的正当理由） |
 | `AddHttpClient<T>` 注册的 typed client | 工厂管理（Transient） | **不要被 Singleton 捕获**（见下） |
 
+**单例 VM 成立的前提**（不满足就改 `Transient`/`Scoped`）：① 没有「每实例该重置」的状态；② 若持有 `IDisposable` 依赖，接受它活到进程退出；③ 订阅的外部事件/消息能解绑。
+
 **typed client 不要注入 Singleton**：`AddHttpClient<T>` 注册的是 Transient，被 Singleton VM 捕获会阻止 handler 轮换/DNS 更新。需要时改为在 Singleton 中注入 `IHttpClientFactory` 并按需 `CreateClient()`，或把 VM 改为 Transient。
+
+**多实例 VM 一律用 `Transient`**（多数容器把 `Transient` 作为默认生命周期）：会同时存在多份的 VM（多文档 / 多编辑器 / 每个日志控件各自的 VM）必须是 `Transient`；状态无法共享正是「各持独立一份」的判据。**注册成 `Singleton` 是错误**，不是「不推荐」。
+
+**瞬态 VM 的两个陷阱**：① 订阅了单例/静态事件，或注册到 `StrongReferenceMessenger` 未 `Unregister` → 名义瞬态、实际被发布者长期引用（改 `WeakReferenceMessenger`，或在停用时注销）；② VM 自身实现 `IDisposable` 却从长命处解析 → 落进红区 1（改 `Scoped` + 每窗口 scope，或工厂自管释放）。
 
 ## WinForms
 
@@ -162,6 +173,8 @@ public sealed class SyncWorker(IServiceScopeFactory scopes, ILogger<SyncWorker> 
 ```
 
 注册：`builder.Services.AddHostedService<SyncWorker>();`。长期运行的外部调用（HTTP）失败要记录并重试，不能拖垮主流程。
+
+> ⚠️ 上面的 `using (var scope = ...)` 必须**在循环体内**。若循环里直接 `GetRequiredService` 拿到实现 `IDisposable` 的瞬态对象，实例会被容器强引用到进程退出（**内存只增不减，`ValidateScopes` 拦不住**）——详见 `framework-practices.md`「🔴 可释放瞬态被容器强引用」。
 
 ## MVVM 要点（强制）
 
