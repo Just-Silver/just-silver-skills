@@ -48,17 +48,13 @@ services.AddSingleton<ReportService>();   // 依赖 IRepository(Scoped)
 services.AddScoped<IRepository, EfRepository>();
 ```
 
-- 真正要避免的是 **Singleton 捕获 Scoped**（如 `IOptionsSnapshot`、`DbContext`）——开发环境 `ValidateScopes`/`ValidateOnBuild` 会直接报错。
+- 真正要避免的是 **Singleton 捕获 Scoped**（如 `IOptionsSnapshot`、`DbContext`）——短命依赖被提升为单例，其释放时机与线程安全假设全部错位。
 - Singleton 依赖 Transient 是**允许**的，但该 Transient 会被提升为单例生命周期、**必须线程安全**。
-- **但若该 Transient 实现 `IDisposable`/`IAsyncDisposable`，规则完全不同**——见下节，`ValidateScopes` **拦不住**这种情况。
+- **但若该 Transient 实现 `IDisposable`/`IAsyncDisposable`，规则完全不同**——见下节。
 - `IOptions`/`IOptionsMonitor`/`ILogger` 都是 Singleton，可安全注入任何生命周期。
 - **typed client（`AddHttpClient<T>`）是 Transient**，不要被 Singleton 捕获（见第 4 节）。
 
-### 开启动态校验（开发环境）
-
-- ASP.NET Core / Generic Host 在开发环境默认开 `ValidateScopes`、`ValidateOnBuild`，会启动即抛“Cannot consume scoped service from singleton”。
-- 手动 `BuildServiceProvider` 时显式传 `new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true }`。
-- 排查“无法解析 X while attempting to activate Y”：注册顺序、生命周期、构造函数歧义（多个可解析构造函数会抛异常）。
+> 排查“无法解析 X while attempting to activate Y”：注册顺序、生命周期、构造函数歧义（多个可解析构造函数会抛异常）。
 
 ### 🔴 可释放瞬态被容器强引用（隐形泄漏 · 红区）
 
@@ -69,7 +65,6 @@ services.AddScoped<IRepository, EfRepository>();
 | 「我在循环里 `using` 了，没漏」 | 实例仍被根容器**强引用**，20 万次解析后堆增长 **206 MB**；`using` 只释放资源，**不摘引用** |
 | 「我把 `Dispose` 写好了」 | 容器在 scope 释放时会**再 `Dispose` 一次**——你的用法变成**二次释放** |
 | 「我改成工厂注册绕开追踪」 | `AddTransient(sp => new X())` **照样被追踪**（实测堆增长 103 MB） |
-| 「开发环境开了 `ValidateScopes`」 | 只校验 `Scoped`；从根容器解析 Transient **完全静默**（实测无异常） |
 | 「跑了几个月都正常」 | 泄漏是**线性累积**：1 次/秒 ≈ 每天 8.6 万个永不回收的对象，崩溃只是时间问题 |
 
 **规则：容器会强引用它创建的每一个 `IDisposable`/`IAsyncDisposable` 实例，直到「拥有它的那个 scope」被释放。** 根容器（root provider）本身就是一个 scope，活到进程退出——所以**从根容器解析可释放瞬态 = 内存只增不减**。
@@ -78,7 +73,7 @@ services.AddScoped<IRepository, EfRepository>();
 
 - **每个实例被永久钉在堆上**：托管内存随解析次数无界增长（句柄另算）。
 - **手动 `Dispose()` 救不了**：`Dispose` 只释放该实例自己的资源，**不会**把它从容器的追踪列表里摘掉；它反而会**二次释放**（容器在 scope 释放时再 `Dispose` 一次）。
-- **`ValidateScopes` / `ValidateOnBuild` 拦不住**：它们只校验 **Scoped** 的捕获式依赖，对「从根容器解析 Transient」完全静默。官方 guidelines 也明说：**不要用 Transient 生命周期注册 `IDisposable`**。
+- **`Dispose` 边界 = scope 边界**：容器在**拥有它的 scope 释放时**统一 `Dispose`。官方 guidelines 明说：**不要用 `Transient` 生命周期注册 `IDisposable`**。
 
 典型触发点（都长得很正常）：
 
@@ -91,7 +86,7 @@ public sealed class PollingService(IServiceProvider provider) : BackgroundServic
         while (!ct.IsCancellationRequested)
         {
             using var session = provider.GetRequiredService<PlcSession>(); // PlcSession : IDisposable
-            await session.PollAsync(ct);   // 每秒泄漏一个，ValidateScopes 全程无感
+            await session.PollAsync(ct);   // 每秒泄漏一个
             await Task.Delay(1000, ct);
         }
     }
@@ -124,7 +119,7 @@ public sealed class PollingService(IServiceProvider provider) : BackgroundServic
 
 > ⚠️ `CreateScope()` 只在**每轮/每批**创建时才有效。把 scope 建在长循环**外面**，等于换成另一个长命 scope，照样累积。
 
-2. **提升为 `Scoped`**：若「一个工作单元一个实例」正是语义，直接注册 `AddScoped`——既表达意图，又让 `ValidateScopes`/`ValidateOnBuild` 重新生效（误注入 Singleton 会**启动即报错**）。**能用 `Scoped` 就不要用 `Transient`**，这是最省心的护栏。
+2. **提升为 `Scoped`**：若「一个工作单元一个实例」正是语义，直接注册 `AddScoped`——既表达意图，也把释放边界交给 scope。**能用 `Scoped` 就不要用 `Transient`**。
 
 3. **工厂模式**（官方对「瞬态、有限生命周期」场景的正式方案）：**根本不注册**这个类型，改为注册一个**工厂**（单例），由它提供实例、由消费者负责释放——容器不认识这些实例，自然不追踪。**这是官方认可的解法，不是绕路**：
 
@@ -141,7 +136,7 @@ public sealed class PollingService(IServiceProvider provider) : BackgroundServic
 
    > 注意：`AddTransient(sp => new PlcSession())` **不是**工厂模式——它仍注册为 Transient，工厂创建的实例**照样被追踪**。
 
-4. 也可用 `ActivatorUtilities.CreateInstance<T>(sp)` 直接构造（容器不追踪），无需额外工厂类；代价是它**绕过 DI 校验**，依赖关系不如显式工厂清晰。
+4. 也可用 `ActivatorUtilities.CreateInstance<T>(sp)` 直接构造（容器不追踪），无需额外工厂类；代价是它**绕过容器**，依赖关系不如显式工厂清晰。
 
 ### 权威来源（改写自官方原文，非二手结论）
 

@@ -146,8 +146,7 @@ await host.StopAsync();
 ```csharp
 var services = new ServiceCollection();
 services.AddSingleton<IThing, Thing>();
-using var provider = services.BuildServiceProvider(
-    new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
+using var provider = services.BuildServiceProvider();
 ```
 
 ## Worker / 后台服务
@@ -174,7 +173,7 @@ public sealed class SyncWorker(IServiceScopeFactory scopes, ILogger<SyncWorker> 
 
 注册：`builder.Services.AddHostedService<SyncWorker>();`。长期运行的外部调用（HTTP）失败要记录并重试，不能拖垮主流程。
 
-> ⚠️ 上面的 `using (var scope = ...)` 必须**在循环体内**。若循环里直接 `GetRequiredService` 拿到实现 `IDisposable` 的瞬态对象，实例会被容器强引用到进程退出（**内存只增不减，`ValidateScopes` 拦不住**）——详见 `framework-practices.md`「🔴 可释放瞬态被容器强引用」。
+> ⚠️ 上面的 `using (var scope = ...)` 必须**在循环体内**。若循环里直接 `GetRequiredService` 拿到实现 `IDisposable` 的瞬态对象，实例会被容器强引用到进程退出（**内存只增不减**）——详见 `framework-practices.md`「🔴 可释放瞬态被容器强引用」。
 
 ## MVVM 要点（强制）
 
@@ -207,6 +206,6 @@ public sealed class SyncWorker(IServiceScopeFactory scopes, ILogger<SyncWorker> 
 1. **“不是 Web 就不用 DI”**：直接在 code-behind 里 `new HttpClient()` / `new SqlRepository()`，静态 helper 满天飞。→ 引入 Generic Host。
 2. **把容器当 Service Locator**：`App.Services.GetRequiredService<X>()` 散落在业务代码。→ 只在 Composition Root 用，其余构造注入。
 3. **所有东西 Singleton**：每文档 VM 用 Singleton → 关闭再打开报错、状态串味。→ 按生命周期选。
-4. **Singleton 捕获 typed client / `DbContext`**：captive dependency，静默把短命依赖变单例。→ 开发环境开 `ValidateScopes`/`ValidateOnBuild`。
+4. **Singleton 捕获 typed client / `DbContext`**：captive dependency，静默把短命依赖变单例。→ 按实际生命周期注册，长命服务不得捕获更短依赖。
 5. **多个 `BuildServiceProvider()`**：每个都是独立容器，Singleton 不共享。→ 启动只建一次。
 6. **窗口/VM 构造函数只写无参、依赖靠属性赋值**：隐藏依赖、无法启动期校验。→ 构造注入。

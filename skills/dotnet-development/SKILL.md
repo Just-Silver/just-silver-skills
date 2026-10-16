@@ -9,13 +9,13 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 
 # 🛑 开发红区 —— 写代码前先读，命中即停
 
-> **本节优先级高于本文档其余一切内容。** 以下问题会**静默**毁掉生产（内存/句柄只增不减、数据错乱、进程崩溃），而**编译器、`ValidateScopes`、常规工具、日常代码审查全都发现不了**——只有上线运行数周/数月后才爆。
+> **本节优先级高于本文档其余一切内容。** 以下问题会**静默**毁掉生产（内存/句柄只增不减、数据错乱、进程崩溃），而**编译器、常规工具、日常代码审查全都发现不了**——只有上线运行数周/数月后才爆。
 >
-> **命中任意一条：立刻停下来修，不要继续往下写。** 下列理由一律无效：「能跑就行」·「应该没事」·「我手动 `Dispose` 了」·「开了 `ValidateScopes`」·「已经跑了几个月都正常」。
+> **命中任意一条：立刻停下来修，不要继续往下写。** 下列理由一律无效：「能跑就行」·「应该没事」·「我手动 `Dispose` 了」·「已经跑了几个月都正常」。
 
 | # | 红线 | 为什么致命（静默） |
 |---|------|-------------------|
-| **1** | **从根容器反复解析实现 `IDisposable` 的瞬态对象**（`Singleton` 注入 `IServiceProvider`，在循环 / `Timer` 回调 / 后台服务里 `GetRequiredService`） | 实例被容器**强引用到进程退出**，内存/句柄只增不减。**手动 `Dispose()`、改成工厂注册、`ValidateScopes`/`ValidateOnBuild` 全都救不了**（三条均已实测）。官方原话：**不要用 `Transient` 注册 `IDisposable`** |
+| **1** | **从根容器反复解析实现 `IDisposable` 的瞬态对象**（`Singleton` 注入 `IServiceProvider`，在循环 / `Timer` 回调 / 后台服务里 `GetRequiredService`） | 实例被容器**强引用到进程退出**，内存/句柄只增不减。**手动 `Dispose()`、改成工厂注册都救不了**（均已实测）。官方原话：**不要用 `Transient` 注册 `IDisposable`** |
 | **2** | **`catch (Exception) { }` 静默吞异常** | 故障被掩盖、日志无痕，最终在无关的地方以无关的形态爆发 |
 | **3** | **`.Result` / `.Wait()` / `async void`** | 死锁与进程崩溃，通常只在生产并发下才露出（`async void` 仅框架回调 / `override` 这类签名不可改处例外） |
 | **4** | **`HttpClient` 用错**：长期持有却不设 `PooledConnectionLifetime`，或频繁 `new` | DNS 不更新 / 端口耗尽，延迟数小时至数天才爆 |
@@ -98,7 +98,7 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 | 万能类：`XxxManager` / `XxxHelper` / `XxxUtil` / 超长 `Service` | 职责发散，一个类多个变化原因 | 按职责拆分，让行为回到所属对象 |
 | 每个类都造 `IXxx` + `Xxx` | 只为“像 DI”而加文件，无替换价值 | 只在真实边界/可替换/可测试处抽接口 |
 | 为架构而架构：无实际用途的 `Factory`/`Handler`/`Wrapper`/`BaseService`/`Repository` 层 | 增加跳转层级与维护成本，收益为零 | 简单实现能解决就不加中间层；出现第二实现/变化点再加 |
-| `Singleton` 捕获 `Scoped`/`Transient` 依赖（captive dependency） | 短生命周期被提升为单例，串请求状态 | 按实际生命周期注册；开发环境开 `ValidateScopes`/`ValidateOnBuild`。**注意**：捕获 Scoped 会被校验抓到（不静默）；但若被捕获的是可释放 Transient，则校验抓不到 → 属红区 1 |
+| `Singleton` 捕获 `Scoped`/`Transient` 依赖（captive dependency） | 短生命周期被提升为单例，串请求状态 | 按实际生命周期注册，长生命周期服务不得捕获更短的依赖；若被捕获的是可释放 `Transient`，属红区 1 |
 | `Console.WriteLine` / 直接依赖具体日志实现 | 无结构、无法分级过滤、业务耦合基础设施 | 注入 `ILogger<T>`，结构化日志 |
 | `Environment.GetEnvironmentVariable` 散读配置 | 魔法字符串、无校验、无法热更新 | Options 强类型绑定 + 校验 |
 
@@ -121,7 +121,7 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 - [ ] 有本该属于对象、却被塞进外部 Service 的业务逻辑？
 - [ ] 有为了模式而模式的抽象层（无第二实现、无变化点）？
 - [ ] 生命周期选择是否与依赖生命周期匹配？有无 captive dependency？
-- [ ] 循环 / `Timer` / 后台服务里，是否从根容器解析了实现 `IDisposable` 的瞬态对象？（会被强引用到进程退出；手动 `Dispose` 与 `ValidateScopes` 都救不了）
+- [ ] 循环 / `Timer` / 后台服务里，是否从根容器解析了实现 `IDisposable` 的瞬态对象？（会被强引用到进程退出；手动 `Dispose` 救不了）
 - [ ] 外部依赖（DB/HTTP/时间/文件）是否可替换、可单测？
 - [ ] 异常是否被真正处理或向上抛出，而非静默吞掉？
 - [ ] 配置走 Options、日志走 `ILogger<T>` 了吗？
