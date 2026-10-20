@@ -1,1 +1,1 @@
-upstream=https://github.com/obra/superpowers.git branch=main src=skills
+upstream=https://github.com/fcavalieri/superpowers-remix.git branch=main ref=109f8ebd454621368d8f064de375705b1eb53e4e src=skills
