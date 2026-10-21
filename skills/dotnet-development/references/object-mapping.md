@@ -8,6 +8,27 @@
 
 Mapster **开箱即用**：同名的同类型成员自动对齐，嵌套对象、集合（`List<T>` / 数组 / 字典 / `IEnumerable<T>` / `IReadOnlyList<T>` 等接口）、record、拍平（`Supervisor.Name` → `SupervisorName`）都自动递归处理。
 
+### 拍平的边界（实测）
+
+「拍平」指目标成员名 = 源上一条**属性路径**的拼接，于是看似不对等的两个成员能自动对应上：
+
+```csharp
+public sealed class Staff   { public string Name { get; set; } public Staff? Supervisor { get; set; } }
+public sealed class StaffDto { public string? SupervisorName { get; set; } }   // 目标无同名成员
+
+staff.Adapt<StaffDto>().SupervisorName;   // "Bob" —— 零配置
+```
+
+| 情况 | 行为 |
+|---|---|
+| `Supervisor.Name` → `SupervisorName` | ✅ 自动（多级同理：`A.Supervisor.Name` → `ASupervisorName`） |
+| 路径中途为 `null` | ✅ 得到 `null`，不抛异常 |
+| 目标同时有 `SupervisorName` 同名字段与拍平候选 | ✅ 精确同名优先 |
+| 集合元素内的拍平（`Members[0].SupervisorName`） | ✅ 自动，无需为元素类型单独配 |
+| 下划线/其它命名（`supervisor_name`） | ❌ 只按 PascalCase 路径拼接匹配，不命中 |
+| 反推（`SupervisorName` → `Supervisor.Name`） | ❌ 正向才自动；反向要显式 `.Unflattening(true)` 或 `.TwoWays()` |
+| 计算字段（`MemberCount = Members.Count`） | ❌ 拍平只做**属性路径**拼接，不推表达式；这类仍要 `.Map` |
+
 所以**绝大多数实体 → DTO 转换不需要写任何配置**：
 
 ```csharp
@@ -30,13 +51,14 @@ return mapper.Map<List<ProductDto>>(products);
 
 | 触发条件 | 配置 |
 |---|---|
-| 目标成员要**计算/拼接**（`FullName = First + " " + Last`、`LineCount = Lines.Count`） | `.Map(d => d.FullName, s => s.FirstName + " " + s.LastName)` |
+| 目标成员要**计算/拼接**（`FullName = First + " " + Last`、`LineCount = Lines.Count`） | `.Map(d => d.FullName, s => s.FirstName + " " + s.LastName)`；注意单纯「嵌套属性同名拼接」属拍平、不用配，但**含表达式/方法调用**的不算拍平 |
 | 成员**改名**（`Sku` → `Code`）或类型不同 | `.Map(d => d.Code, s => s.Sku)` |
 | 要**忽略**目标上的可写成员（不接收该值） | `.Ignore(d => d.X)` |
 | 要锁成**白名单**（只映射显式声明的成员） | `.Map(...)` 逐条 + `.IgnoreNonMapped(true)` |
 | 按源**条件**取值 | `.Map(dest, src, cond)` 多段，默认段放最后；条件命中时想跳过用 `IgnoreIf` |
 | 目标只有**构造器 / record / 只读属性** | `.MapToConstructor(true)` 或 `.ConstructUsing(s => new D(...))` |
 | 需要**双向**映射 / 反向 unflatten | `.TwoWays()`（**必须在后续 `.Map(...)` 之前调用**）/ `.Unflattening(true)` |
+| 映射**之后**还要补一步 | `.AfterMapping((src, dest) => ...)`；**注意投影路径会静默跳过它**，线上路径要另行显式处理 |
 | DTO → 实体只覆盖**有值字段** | `.IgnoreNullValues(true)` |
 | 带导航属性的实体**写回** | `.EntityFromContext(db)`（`Mapster.EFCore`） |
 | 映射里要用**注入的服务** | `MapContext.Current.GetService<T>()` + `ServiceMapper` |
@@ -75,12 +97,14 @@ return mapper.Map<OrderSummaryDto>(order);
 
 | 源的状态 | 用法 |
 |---|---|
-| 已物化（实体实例、`List<T>`） | 注入 `IMapper`：`mapper.Map<TDest>(src)` / `mapper.Map<List<TDest>>(list)`；未用实例配置时 `src.Adapt<TDest>()` 等价 |
+| 已物化（实体实例、`List<T>`） | 注入 `IMapper`：`mapper.Map<TDest>(src)` / `mapper.Map<List<TDest>>(list)` |
 | 写回已存在的对象 | `mapper.Map(src, dest)`（就地写，返回同一个实例） |
 | 仍是 `IQueryable` | `query.ProjectToType<TDest>(config)` 后 `ToListAsync()`，只取需要的列 |
 | 映射需要注入的服务 | `MapContext.Current.GetService<T>()`，需配合 `ServiceMapper` |
 
 **`Adapt` 与 `IMapper` 的差别只在配置来源，不是“哪个能用”**：无参 `src.Adapt<TDest>()` 固定读 `TypeAdapterConfig.GlobalSettings`；`IMapper` 读它自己持有的那个 config 实例。项目**只用约定映射时两者等效**；一旦用了自定义 config 实例，无参 `Adapt` 就拿不到那些自定义规则——派生字段会**静默变成 0/null**，编译期毫无提示。这种情况改用注入的 `IMapper`，或显式传 `src.Adapt<TDest>(config)`。
+
+> 值类型上有个细节：无参 `Adapt<TDest>()` 的签名是 `Adapt<TDestination>(this object? source)`（源码 `TypeAdapter.cs`），源会被装箱；`Adapt<TSource, TDestination>()` 是泛型直传、不装箱。高频映射值类型时用后者。
 
 ## 需要自定义规则时：`IRegister` + 实例
 
@@ -110,9 +134,11 @@ builder.Services.AddSingleton(mapConfig);
 builder.Services.AddScoped<IMapper>(sp => new Mapper(sp.GetRequiredService<TypeAdapterConfig>()));
 ```
 
-- 配置里需要**注入服务**（`MapContext.Current.GetService<T>()`）时，才换成 `Mapster.DependencyInjection` 的 `AddScoped<IMapper, ServiceMapper>()`；它负责把 `IServiceProvider` 塞进映射上下文，并让 `mapper.Map(...)` 的生命周期跟随注入的服务。
-- `AddMapster()` 只注册 `IMapper → Mapper`（Transient）并绑定 `TypeAdapterConfig.GlobalSettings`——它**不会**注册你自己 new 的 config 实例，也不提供服务注入（服务注入要用 `ServiceMapper`）。走了自己的 config 就必须自己注册 `IMapper`。
-- 配置只在启动期构建一次：`Compile()` 之后再改配置会抛异常。不要在业务方法里 `new TypeAdapterConfig()`，也不要每次调用 `Fork` 出新配置。
+- 配置里需要**注入服务**（`MapContext.Current.GetService<T>()`）时，必须换成 `Mapster.DependencyInjection` 的 `AddScoped<IMapper, ServiceMapper>()`：只有 `ServiceMapper` 会把 `IServiceProvider` 塞进映射上下文。用普通 `Mapper`（含 `AddMapster()` 的默认注册）时调用 `GetService<T>()` 会**直接抛 `InvalidOperationException`**（"Mapping must be called using ServiceAdapter"），不是返回 null。
+- `ServiceMapper` 的构造函数是 `(IServiceProvider, TypeAdapterConfig)`——**`TypeAdapterConfig` 必须先注册进 DI**（`AddSingleton(mapConfig)`），否则解析 `IMapper` 时就失败。这一点与 `AddMapster()` 不同，后者自带 `GlobalSettings`。
+- 取了服务就**不能再用投影**：`ProjectToType` 要把映射翻译成 SQL，`GetService`/方法调用翻译不了，实测会抛 `InvalidOperationException`（"Mapping must be called using ServiceAdapter"）——不是静默降级。需要服务参与时，物化之后再 `mapper.Map`，或把该字段排除在投影外再补。
+- `AddMapster()` 精确等价于 `AddTransient<IMapper, Mapper>()`：只注册 `Mapper`（Transient、绑定 `TypeAdapterConfig.GlobalSettings`），**不**注册你的 config 实例，也**不**提供 `ServiceMapper` 的服务注入能力。用了自己的 config 就必须自己注册 `IMapper`。
+- 配置只在启动期构建一次：不要在业务方法里 `new TypeAdapterConfig()`，也不要每次调用时 `Fork` 出新配置（`Fork` 带缓存，但按调用点生成键，散用等于持续制造配置）。**`Compile()` 之后并非不能改**——`NewConfig`/`ForType` 会清掉该类型对的已编译缓存，新规则正常生效；但「先 `Compile` 再改」等于把配置校验拆成两半，`Compile` 的意义就没了，所以配置应当在 `Compile()` 之前定稿。
 - **配置按类型对生效，不随父类型传递**：父类型配了 `PreserveReference` / `MaxDepth` 等设置，子类型要同样的行为得单独配。
 
 ## 常用配方
@@ -120,9 +146,10 @@ builder.Services.AddScoped<IMapper>(sp => new Mapper(sp.GetRequiredService<TypeA
 | 需求 | 写法 |
 |---|---|
 | 拼接/派生字段 | `.Map(d => d.FullName, s => s.FirstName + " " + s.LastName)` |
+| 嵌套属性拼到目标同名（拍平） | **不用写**：`Supervisor.Name` → `SupervisorName` 自动；反向才需 `.Unflattening(true)` |
 | 不暴露内部字段 | 目标 DTO 不声明该属性即不映射；要锁成白名单则 `.IgnoreNonMapped(true)` + 显式 `.Map` |
 | 更新实体（只覆盖有值字段） | `config.NewConfig<Dto, Entity>().IgnoreNullValues(true)`，再 `mapper.Map(dto, entity)` |
-| 带导航属性的实体写回 | `dto.BuildAdapter().EntityFromContext(db).AdaptTo(entity)`（`Mapster.EFCore`，自动在导航集合里找已跟踪实体） |
+| 带导航属性的实体写回 | `dto.BuildAdapter().EntityFromContext(db).AdaptTo(entity)`（`Mapster.EFCore`）：按**主键**用 `db.Set<T>().Find(...)` 取已跟踪实体，找不到才 `new`。因此 DTO 必须带上主键，且源类型要能读到该主键值，否则抛 `InvalidOperationException` |
 | record / 只读构造器 | `.MapToConstructor(true)`，或 `.ConstructUsing(s => new D(s.Id, s.Name))` |
 | 双向映射（含 unflatten） | `.TwoWays()`，**必须在后续 `.Map(...)` 之前调用** |
 | 每次映射的运行时参数 | `poco.BuildAdapter().AddParameters("user", name).AdaptToType<Dto>()` + `MapContext.Current.Parameters["user"]` |
@@ -148,9 +175,9 @@ config.NewConfig<Product, ProductDto>();   // 不写 .Map：只把它纳入校�
 
 ## 陷阱
 
-- **映射要纯**：不在配置里查库、发 HTTP、写日志。`AfterMapping` 是逃生口，不是常规手段——它会让映射无法投影成 SQL。
+- **映射要纯**：不在配置里查库、发 HTTP、写日志。`AfterMapping` 是逃生口，不是常规手段——实测它在 `ProjectToType` 投影里**不生效**（静默跳过，不报错），需要后处理就放到映射之后显式做。
 - **投影路径**（`ProjectToType`）必须用真实数据库跑一次集成测试：内存测试证明不了“生成的 SQL 正确、结果完整”。官方文档对 EF 场景的 `ProjectToType` 同时给了用法和一条「先物化再投影」的警告，两者冲突时以项目里的集成测试结果为准。
-- **`PreserveReference` 不支持 EF 查询投影**；`MaxDepth` 支持，但每层都会生成映射代码，深度别开大。
+- **`PreserveReference` 用于投影会直接编译失败**（抛 `CompileException`），这一点比「不支持」更强——它不是静默降级；`MaxDepth` 可在投影中使用，但每层都会生成映射代码，深度别开大。
 - **DTO → 实体写回前先确认字段所有权**：全量 `mapper.Map(dto, entity)` 会连带覆盖本不该改的字段（状态、审计列、内部备注）。只映射允许改的成员，`Ignore` 掉主键、审计列与不在编辑表单里的字段。Mapster 默认连**默认值也写入**：源没带该字段时，实体上的值会被清成 `0`/`null`/空串。
 - **`mapper.Map(src, dest)` 默认整体替换目标上的集合，不做元素级合并**：给已跟踪实体写回时，导航集合会被换成源里的新集合，EF 可能按孤儿规则删掉旧子实体。要保留跟踪身份就 `Ignore` 该导航属性并在服务里按业务键同步（或让集合属性走 `[UseDestinationValue]` / 配置 `UseDestinationValue` 的“清空 + 填充”）。
 - **映射同类型 / 聚合根会触发深拷贝与递归**：环形引用会栈溢出，需要 `PreserveReference` 或 `MaxDepth`，并且要逐类型对配置。
