@@ -1,6 +1,6 @@
 ---
 name: dotnet-development
-description: Use when writing, modifying, or reviewing C# / .NET code in any project type (ASP.NET Core, WPF, WinForms, Avalonia, MAUI, Blazor, console, worker, class library) — designing classes and services, registering or resolving dependencies, choosing service lifetimes, or diagnosing memory/handle growth in long-running or background services, structuring modules/layers, building MVVM ViewModels with CommunityToolkit.Mvvm, deciding whether an abstraction, interface, or design pattern is warranted, or when about to introduce a service locator, hidden dependency, god class, or abstraction "for architecture's sake" — also use when about to hand-write INotifyPropertyChanged, an ICommand, or manual property-change UI wiring instead of the CommunityToolkit.Mvvm source generators.
+description: Use when writing, modifying, or reviewing C# / .NET code in any project type (ASP.NET Core, WPF, WinForms, Avalonia, MAUI, Blazor, console, worker, class library) — designing classes and services, registering or resolving dependencies, choosing service lifetimes, diagnosing memory/handle growth in long-running or background services, structuring modules/layers, building MVVM ViewModels with CommunityToolkit.Mvvm, deciding whether an abstraction or design pattern is warranted, mapping entities to DTOs or API contracts — or when about to introduce a service locator, a god class, an abstraction "for architecture's sake", a hand-written INotifyPropertyChanged / ICommand / property-change UI wiring, or property-by-property entity↔DTO conversion, instead of the CommunityToolkit.Mvvm source generators and Mapster.
 ---
 
 # .NET 开发规范
@@ -41,6 +41,7 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 - **DI 容器**：一律 **Microsoft.Extensions.DependencyInjection**（经 `Host.CreateApplicationBuilder` / `Host.CreateDefaultBuilder` 或 `ServiceCollection`）；**不引入** Autofac / Unity / Prism 等第三方容器，也不自研容器。
 - **基础设施**：优先 **Microsoft.Extensions.\*** 官方包——`Hosting`、`Configuration.*`、`Options.*`、`Logging.*`、`Http`（`IHttpClientFactory`）、`Http.Resilience`、`Caching.*`、`DependencyInjection`。日志、配置、HTTP、缓存、健康检查都走这些抽象。
 - **MVVM**：一律 **CommunityToolkit.Mvvm**；`[ObservableProperty]` **必须**用 partial property 新写法 `public partial string? Name { get; set; }`，**禁止**旧字段式 `private string? _name;`。详见 `references/mvvm-communitytoolkit.md`。
+- **对象映射**：一律 **Mapster**——实体 / 领域模型 ↔ DTO、API 契约之间**不手写逐属性赋值**。Mapster **开箱即用**：成员同名同类型时零配置（含嵌套、集合、record），**只在需要计算字段 / 改名 / 忽略 / 写回等自定义规则时**才写 `IRegister` 配置。详见 `references/object-mapping.md`。
 - **时间/测试**：时间用 `TimeProvider`；测试用 `Microsoft.Extensions.TimeProvider.Testing`。
 - **服务生命周期**：按**需求**选，不是按偏好——多数容器默认 `Transient`；`Singleton` 的正当理由是「全局共享」或「创建昂贵」（**不要无理由地给无状态服务用 `Singleton`**）；**可释放对象必须有释放边界**（见红区 1 与 `references/framework-practices.md` 第 1 节「DI 生命周期」及其下「可释放对象（`IDisposable`）的归宿」）。
 
@@ -49,6 +50,7 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 - 编写 / 修改 / 审查任意 C# / .NET 代码（含 Web、桌面、控制台、类库、后台服务）
 - 写 / 改 ViewModel、XAML 数据绑定、`ICommand`，或需要在属性变化时联动 UI（**必读** `references/mvvm-communitytoolkit.md`，先看下方「特性速查」定位）
 - 设计类、服务、模块分层；注册或解析依赖；选择 `Singleton` / `Scoped` / `Transient`
+- 实体 / 领域模型 ↔ DTO / API 契约的转换（**必读** `references/object-mapping.md`），或正在写逐属性赋值的映射代码
 - 纠结“要不要抽接口 / 上工厂 / 建继承体系 / 拆服务 / 用某个设计模式”
 - 重构、代码审查，或排查“难测试 / 难维护 / 改动牵连大”的设计
 
@@ -60,6 +62,7 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 |------|------|
 | 核心原则、SOLID、抽象/继承、模式取舍、开发顺序、审查标准 | `references/design-principles.md` |
 | DI 生命周期、Options、`ILogger<T>`、`IHttpClientFactory`、异常、async、数据访问 | `references/framework-practices.md` |
+| **对象映射**：实体 ↔ DTO / API 契约、写回实体、`ProjectToType` 投影、需要自定义规则时才写配置 → **命中即读** | `references/object-mapping.md` |
 | WPF / WinForms / Avalonia / 控制台 / Worker 的 Composition Root、组装与项目结构 | `references/app-composition.md` |
 | **MVVM（任何 UI 框架）**：写 / 改任一视图（XAML/AXAML/code-behind）、ViewModel、数据绑定、`ICommand` 或输入校验 → **命中即读，先读本行**（不等“按需”） | `references/mvvm-communitytoolkit.md` |
 
@@ -94,6 +97,7 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 | 手写 `ICommand` / 自造命令；**同对象内**联动用手写 `PropertyChanged` 订阅或手动刷新 `CanExecute`；输入无校验、或校验不门禁命令 | 样板易漏通知、命令可用性不刷新、按钮重复点击、非法输入仍可提交；且绕过源生成器 | `[RelayCommand]`（异步带 `CancellationToken`，默认执行期禁用防重复点击）；联动优先 `OnXxxChanged` 钩子 + `[NotifyPropertyChangedFor]` / `[NotifyCanExecuteChangedFor]`（**仅跨对象**才订阅）；校验 `ObservableValidator` + `[NotifyDataErrorInfo]`，命令用 `HasErrors` 门禁 |
 | VM / 视图直接调用 `TopLevel`、`StorageProvider`、`Application.Current`、`File.*`、`MessageBox` 等平台/宿主 API | 无法单测、耦合宿主、跨平台迁移受阻 | 抽 `IFilePicker` / `IDialogService` / `IClipboard` 之类接口，在组装点绑定实现、构造注入 |
 | 静态可变状态 / 全局上下文 / 静态工具类承载业务 | 隐式全局状态，并发与测试噩梦 | 无状态服务 + DI；纯函数工具才可静态 |
+| 手写实体 ↔ DTO 转换：逐属性 `new Dto { X = e.X }`、查询里逐字段 `Select` 拷贝、每对类型一个 `ToDto()`/`XxxMapper` | 属性改名不报错、新增字段静默漏、重复代码逐处漂移；漏字段要到线上才发现 | **Mapster**：默认**零配置**直接 `mapper.Map<T>()`（同名成员自动对齐，含嵌套/集合）；只有派生字段、改名、忽略、写回等自定义规则才加一条 `NewConfig`。见 `references/object-mapping.md` |
 | 应用/业务层直接依赖 `DbContext`、`SqlConnection`、`HttpClient`、`DateTime.Now`、文件系统 | 高层耦合具体基础设施 | 通过接口/边界接入；时间用 `TimeProvider`，HTTP 用 `IHttpClientFactory` |
 | 万能类：`XxxManager` / `XxxHelper` / `XxxUtil` / 超长 `Service` | 职责发散，一个类多个变化原因 | 按职责拆分，让行为回到所属对象 |
 | 每个类都造 `IXxx` + `Xxx` | 只为“像 DI”而加文件，无替换价值 | 只在真实边界/可替换/可测试处抽接口 |
@@ -123,6 +127,7 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 - [ ] 生命周期选择是否与依赖生命周期匹配？有无 captive dependency？
 - [ ] 循环 / `Timer` / 后台服务里，是否从根容器解析了实现 `IDisposable` 的瞬态对象？（会被强引用到进程退出；手动 `Dispose` 救不了）
 - [ ] 外部依赖（DB/HTTP/时间/文件）是否可替换、可单测？
+- [ ] 实体 ↔ DTO 转换是 `mapper.Map` / `ProjectToType`（纯同构不必写配置），还是散落的手写逐属性赋值？
 - [ ] 异常是否被真正处理或向上抛出，而非静默吞掉？
 - [ ] 配置走 Options、日志走 `ILogger<T>` 了吗？
 
