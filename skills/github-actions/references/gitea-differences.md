@@ -181,7 +181,7 @@
   - `draft` 管**可见性**（未发布，外部不可见），`prerelease` 管**成熟度**（已发布但非生产可用）；两者独立，不要用 draft 代替 prerelease
   - `GET .../releases/latest` 只返回**非 draft、非 prerelease** 的最新一条；标记正确后，rc 不会顶掉首页的稳定版
   - 已存在 Release 返回 409 时，改标记要 `PATCH /repos/{owner}/{repo}/releases/{id}`（body `{ "prerelease": true }`）；重新 POST 不会改旧值
-  - 实测（Gitea 28.x）：创建 rc 后 `/releases/latest` 返回 404；补稳定版后 latest 指向稳定版；`?pre-release=true` 可筛出 rc；`PATCH {prerelease:false}` 可转正
+  - 实测（Gitea 28.x）：**仓库尚无稳定版时**，创建 rc 后 `/releases/latest` 返回 404；**已有稳定版时**，再发 rc 仍返回该稳定版（实测 `v0.12.0`）；`?pre-release=true` 可筛出 rc；`PATCH {prerelease:false}` 可转正
 - **API 形态**：`POST {server_url}/api/v1/repos/{owner}/{repo}/releases`，鉴权 `Authorization: token $GITEA_TOKEN`（`GITEA_TOKEN` 须 `env: GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}` 显式注入，不裸注入），payload `{tag_name,name,body,draft,prerelease}`（`prerelease` 按 tag 推导，见上；勿写死），成功 `201`/`200`；已存在 `409` 时按 tag 查 id 并 `PATCH` 校正 `prerelease`，**不要静默跳过**
 - **验证预发布**：创建后 `GET .../releases?pre-release=true` 应包含 rc/beta；`GET .../releases/latest` 在只有预发布时返回 404、有稳定版时仍返回稳定版
 - **校验**：`github.server_url/repository/ref_name` 均在 `references/contexts.md` 常用属性表已列；用 `github.*` 可直接过 `actionlint`，无需 `-ignore`
