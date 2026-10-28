@@ -47,7 +47,7 @@ GitHub Actions 与 Gitea Actions 约 95% 语法通用（后者兼容前者）。
 - 硬编码 `http://server:3500` / 固定 `owner/repo` → 用 `${{ github.server_url }}/${{ github.repository }}/${{ github.ref_name }}` 动态拼接（`gitea-differences.md` Release/回推通用模板，push 需去协议头）
 - 发版流水线未校验 `tag == CHANGELOG == package.json`（**单一版本源仓**；monorepo/多制品按各自版本源）或 Release body 非来自 `CHANGELOG.md`（见 `changelog-conventions.md` 一致性卡点）→ CD 发版必须从 `CHANGELOG.md` 该版本小节提取 body，`git log` 堆砌属违规
 - 发版 payload 把 `prerelease` 写死为 `false` → 预发布 tag（`v1.2.3-rc.1` / `-beta.2` / `-alpha`）必须 `true`；`x.y.z` 与 `0.x` 不是预发布；`draft`（未公开）≠ `prerelease`（已公开但非生产可用），别互相替代
-- 409 只当幂等成功、不核对旧 Release 的标记 → 重新 POST 不会改旧值；标记错了须 `PATCH /repos/{owner}/{repo}/releases/{id}` 更新 `prerelease`
+- 重复创建 Release 只当幂等成功、不核对旧标记 → Gitea 返回 `409`、GitHub 返回 `422 already_exists`；重新 POST 不会改旧值，标记错了须 `PATCH /repos/{owner}/{repo}/releases/{id}` 更新 `prerelease`
 - 带 `git push` 回推的 workflow 用 `cancel-in-progress: true` 或各用不同 `group` 名 → 取消丢提交 / 照样 push 冲突；须多个 workflow 共用同一 `group` 名 + `cancel-in-progress: false` 排队（见 `ci-cd-practices.md`「多 workflow 回推排队」）
 
 ## 发版（CD）落地清单

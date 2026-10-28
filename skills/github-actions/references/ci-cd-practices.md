@@ -295,7 +295,7 @@ on:
 - **由 tag 推导，不写死**：`v1.2.3-rc.1` / `-beta.2` / `-alpha` → `prerelease: true`；`v1.2.3` → `false`；`0.x` 是开发阶段版本、`+build` 是构建元数据，都不算预发布。
 - **latest 语义**：GitHub 的 `make_latest` 不接受 draft/prerelease；Gitea `GET /releases/latest` 只取非 draft、非 prerelease。标记正确后，rc 不会顶掉稳定版。
 - **平台写法**：GitHub 用 `gh release create TAG --prerelease` 或 API `prerelease: true`；Gitea API 同名字段（见 `gitea-differences.md`）。
-- **转正/纠错**：用 `PATCH /repos/{owner}/{repo}/releases/{id}` 改 `prerelease`（GitHub 也可 `gh release edit TAG --prerelease=false`）；重复创建返回 409，不会覆盖旧标记。
+- **转正/纠错**：用 `PATCH /repos/{owner}/{repo}/releases/{id}` 改 `prerelease`（GitHub 也可 `gh release edit TAG --prerelease=false`，已实测）；重复创建：Gitea 返回 `409`、GitHub 返回 `422 already_exists`，都不会覆盖旧标记。
 
 ### CHANGELOG 规范与版本治理（发版前必读）
 
