@@ -14,7 +14,7 @@
 | `schedule` | 定时 | POSIX cron，最短 5 分钟 |
 | `workflow_call` | 可复用工作流被调用 | 定义 `inputs`/`outputs`/`secrets` |
 | `workflow_run` | 另一 workflow 完成后触发 | `workflows: ["Build"]` + `types: [completed]` |
-| `release` | 发布 Release 时 | `types: [published, created]`；`published` 对预发布同样触发，生产部署须判 `github.event.release.prerelease == false` |
+| `release` | 发布 Release 时 | `published` 对稳定/预发布都触发；只要正式版用 `types: [released]`，只要预发布用 `types: [prereleased]`（从 draft 发布的预发布不触发 `prereleased`，此时用 `published` + `if`） |
 | `issues` / `issue_comment` | Issue 管理 | `opened` / `closed` / `labeled` 等 |
 | `create` / `delete` | 创建/删除 branch 或 tag | tag 触发的发布常用 `push.tags` 而非 `create` |
 | `merge_group` | 合并队列 | `types: [checks_requested]`，配 PR 检查必加 |
@@ -42,5 +42,6 @@
 
 - `on.<event>.types`：只监听特定活动（如 `issues.types: [opened]`）
 - **`release.published` 不区分预发布**：`v1.2.3-rc.1` 也会触发；生产部署/公告类 workflow 必须加 `if: github.event.release.prerelease == false`（Gitea 的 release 载荷同为 `release.prerelease`），否则 rc 会被当正式版发布
+- **GitHub 也可按活动类型分**：`types: [released]` 只收正式版，`types: [prereleased]` 只收预发布；但**从 draft 发布的预发布不会触发 `prereleased`**（`published` 会触发），需要覆盖这种情况时仍用 `published` + `github.event.release.prerelease` 判断
 - `branches` / `paths` / `tags` 过滤器仅对特定事件可用（`push`/`pull_request`/`pull_request_target` 支持 `paths`）
 - 多个事件同时满足会触发**多次**运行（如同时 push + 打开带 label 的 issue）
