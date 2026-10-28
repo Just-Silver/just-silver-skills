@@ -122,6 +122,13 @@
 - **0.x（0.1.0）阶段**：主版本为 0 时任何变更都可能破坏兼容；约定式提交建议按"假设已发布产品"来写提交，此时 `feat` 也可对应发 0.x 的 minor/patch，但进入 1.0.0 前可随时破坏
 - 发布后打 tag 格式：仓库惯例用 `v` 前缀（`v1.2.3`）以便 `push.tags: ['v*']` 触发；具体见 ci-cd-practices.md「自动发版」
 
+### 预发布版本（pre-release）
+
+- **SemVer 写法**：`1.2.0-rc.1` / `1.2.0-beta.2` / `1.2.0-alpha`；`-` 后是预发布标识，`+` 后是构建元数据（`1.2.0+build.5` **不是**预发布）。
+- **CHANGELOG 与包版本使用同一后缀**：`## [1.2.0-rc.1] - YYYY-MM-DD`；一致性校验按完整版本串比较（tag 去 `v` == CHANGELOG == 包清单），不能只比 `1.2.0`。
+- **Release 标记**：预发布小节对应 `prerelease: true`；正式版 `x.y.z` 为 `false`。`0.x` 是开发阶段，不是预发布。
+- **转正**：`## [1.2.0]` 正式版小节应汇总自上一稳定版以来的完整变更（含 rc 阶段修复）；rc 小节保留历史，不要删。
+
 ## 四、与 CD 流水线的集成（CHANGELOG 是发版的输入，不是输出）
 
 **关键认知**：CHANGELOG 是**发版动作之前**要写好的东西，不是发布后自动"补"的文档。它驱动发布内容，而非被发布驱动。
@@ -143,7 +150,7 @@ tag 版本号 == CHANGELOG 中该版本号（一致性）        ← 流水线�
 
 ### 一致性卡点（强烈建议进 CD 流水线）
 
-发版时**版本号必须三处一致**（适用于**单一版本源仓**：一个 repo 只发布一个版本化产物）：`git tag` / CHANGELOG 顶部版本 / 包管理器版本（`package.json` / `*.csproj` 等）。可在 workflow 里加检查步骤，不一致则失败。**monorepo / 多制品仓**（多 package、或 Docker 镜像 / NuGet / npm 混出）没有单一"包版本"可对——先识别各产物版本来源，按各自"CHANGELOG 小节 ↔ 版本源"校验，**不得为凑三处一致去改产物版本号**：
+发版时**版本号必须三处一致**（适用于**单一版本源仓**：一个 repo 只发布一个版本化产物）：`git tag` / CHANGELOG 顶部版本 / 包管理器版本（`package.json` / `*.csproj` 等）。预发布同样适用，且必须**连后缀一起比**：`v1.2.0-rc.1` ↔ `## [1.2.0-rc.1]` ↔ 包版本 `1.2.0-rc.1`，不能只比 `1.2.0`。可在 workflow 里加检查步骤，不一致则失败。**monorepo / 多制品仓**（多 package、或 Docker 镜像 / NuGet / npm 混出）没有单一"包版本"可对——先识别各产物版本来源，按各自"CHANGELOG 小节 ↔ 版本源"校验，**不得为凑三处一致去改产物版本号**：
 
 ```yaml
 # 伪代码骨架：tag 触发时校验版本一致（具体按 ci-cd-practices.md + workflow-syntax.md 落实）
@@ -181,6 +188,7 @@ tag 版本号 == CHANGELOG 中该版本号（一致性）        ← 流水线�
 - **CHANGELOG 不一致**（只记部分重要变更）→ 用户会误以为 CHANGELOG 是唯一事实源；要么全记要么不记
 - **breaking change 不标** → 破坏性变更淹没在日志里，升级用户踩坑；必须列出 deprecations / removals / breaking
 - **版本号三处不一致**（tag / CHANGELOG / 包版本，**单一版本源仓**）→ 发布后对不上，产物与记录脱节；进流水线强制校验（monorepo/多制品先识别各自版本源，勿强行统一）
+- **预发布版本混同正式版**（少写 `-rc.1` 后缀，或把 `0.x` 当预发布）→ tag / CHANGELOG / 包版本必须带同一后缀，Release 用 `prerelease:true`；正式版小节要汇总完整变更
 - **想靠工具自动生成但提交乱写** → 工具输出垃圾；先立 Conventional Commits + Unreleased 纪律，再自动化
 - **日期格式混乱** → 一律 ISO `YYYY-MM-DD`
 - **发版前才补 CHANGELOG** → 变更早忘了；随手在 Unreleased 记录，发版只是移动整理
@@ -191,5 +199,6 @@ tag 版本号 == CHANGELOG 中该版本号（一致性）        ← 流水线�
 - [ ] 提交遵循 Conventional Commits（或至少有固定类型）；`feat` / `fix` / `BREAKING CHANGE` 分类正确
 - [ ] 版本决策清楚：MAJOR / MINOR / PATCH 对应关系明确（0.x 阶段特例已约定）
 - [ ] 发版时 tag 版本 == CHANGELOG 该版本 == 包清单版本（**单一版本源仓**三处一致，最好进 CI/CD 强制；monorepo/多制品按各自版本源校验）
+- [ ] 预发布使用 `x.y.z-rc.N`/`-beta.N`，CHANGELOG 与包版本带同一后缀，Release 标 `prerelease:true`；正式版汇总完整变更
 - [ ] CHANGELOG 至少列出 breaking / deprecations / removals；日期用 ISO
 - [ ] 明确"手动维护 vs 自动生成"取舍；若用工具，提交规范先立好

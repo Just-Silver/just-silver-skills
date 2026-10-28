@@ -1,6 +1,7 @@
 # Gitea Actions 差异要点（相对 GitHub Actions）
 
 > 官方源：https://docs.gitea.com/usage/actions/（comparison / faq / quickstart / token-permissions / design 页面；右上角可切换目标版本）+ Gitea Runner 仓库文档 https://gitea.com/gitea/runner
+> 官方源（Release API）：https://docs.gitea.com/api/operations/repo-create-release/ （创建/编辑字段 `prerelease`）
 > 本文件是同一技能内 GitHub references 的 **Gitea 补充差异文件**；GitHub 侧语法详见同目录其余文件。
 > **定位**：本文件是维护者提炼的**常见差异速查，不是版本能力的最终权威**；与官方文档冲突时**以官方文档为准**。语法/权限存疑应核对 docs.gitea.com 对应版本文档，**不禁止 Agent 查证**。
 > **版本声明（本技能只覆盖此区间，不做旧版本兼容）**：目标为 **Gitea Server 28.x**（当前稳定版 28.1.0）+ **Gitea Runner 5.x**。Gitea 已去掉历史 `1.` 前缀（28.0.0 = 原 1.28.0）。**1.27 及更早不在支持范围**——目标过旧时请查该版本官方文档，不要套用本文能力。
@@ -104,7 +105,7 @@
 ## Gitea Release 发布（零硬编码，可直接照抄）
 
 > 禁止硬编码 `http://server:3500` / 固定 `owner/repo`（如 `Yin/opencode-gitea`）。实例地址与仓库名必须由上下文动态获取，否则换实例/换仓库即失效。
-> **CHANGELOG 驱动（强制）**：禁止用 `git log PREV_TAG..HEAD` 直拼 Release body 冒充 CHANGELOG（见 `changelog-conventions.md`「糟糕实践」）；`CHANGELOG 是发版的输入`（`ci-cd-practices.md` 标准 CD 全流程 ③），CD 必须从 `CHANGELOG.md` 该版本小节提取。示例仓库需先有 `CHANGELOG.md`（含 `## [Unreleased]`，发版前整理为 `## [x.y.z] - YYYY-MM-DD`）——版本一致性 `tag == CHANGELOG == 包清单版本` 进流水线，不一致即失败（见 `changelog-conventions.md` 一致性卡点；**单一版本源仓**前提，monorepo/多制品按各自版本源）。
+> **CHANGELOG 驱动（强制）**：禁止用 `git log PREV_TAG..HEAD` 直拼 Release body 冒充 CHANGELOG（见 `changelog-conventions.md`「糟糕实践」）；`CHANGELOG 是发版的输入`（`ci-cd-practices.md` 标准 CD 全流程 ③），CD 必须从 `CHANGELOG.md` 该版本小节提取。示例仓库需先有 `CHANGELOG.md`（含 `## [Unreleased]`，发版前整理为 `## [x.y.z] - YYYY-MM-DD`；预发布为 `## [x.y.z-rc.N] - YYYY-MM-DD`）——版本一致性 `tag == CHANGELOG == 包清单版本` 进流水线，不一致即失败（见 `changelog-conventions.md` 一致性卡点；**单一版本源仓**前提，monorepo/多制品按各自版本源）。
 
 - **触发**：`on.push.tags: ['v*']`（打 tag 发版）；`workflow_dispatch` 触发时跳过一致性校验（人工已 gate）
 - **`permissions.contents: write`** 足够（兼容 Gitea `releases: write`）
@@ -125,7 +126,7 @@
             VER="${TAG#v}"
             PKG_VER=$(node -p "require('./package.json').version")
             [ "$VER" != "$PKG_VER" ] && echo "ERROR: tag $TAG != package.json $PKG_VER" >&2 && exit 1
-            grep -q "## \[$VER\]" CHANGELOG.md || { echo "ERROR: CHANGELOG.md 缺少 ## [$VER]" >&2; exit 1; }
+            grep -qF "## [$VER]" CHANGELOG.md || { echo "ERROR: CHANGELOG.md 缺少 ## [$VER]" >&2; exit 1; }
         - name: Extract Release Notes from CHANGELOG
           env:
             TAG_NAME: ${{ github.ref_name }}
@@ -153,13 +154,36 @@
           run: |
             [ -z "$GITEA_SERVER_URL" ] && echo "ERROR: server_url 为空" >&2 && exit 1
             [ -z "$GITEA_REPOSITORY" ] && echo "ERROR: repository 为空" >&2 && exit 1
-            BODY=$(node -e "const fs=require('fs'); const tag=process.env.TAG_NAME; const body=fs.readFileSync('/tmp/changelog.txt','utf8'); console.log(JSON.stringify({tag_name:tag,name:tag,body,draft:false,prerelease:false}))")
+            VER="${TAG_NAME#v}"
+            if printf '%s' "$VER" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+-'; then PRERELEASE=true; else PRERELEASE=false; fi
+            BODY=$(PRERELEASE="$PRERELEASE" node -e "
+              const fs=require('fs');
+              const tag=process.env.TAG_NAME;
+              const body=fs.readFileSync('/tmp/changelog.txt','utf8');
+              console.log(JSON.stringify({tag_name:tag,name:tag,body,draft:false,prerelease:process.env.PRERELEASE==='true'}))
+            ")
             API_URL="$GITEA_SERVER_URL/api/v1/repos/$GITEA_REPOSITORY/releases"
             HTTP_CODE=$(curl -s -o /tmp/resp.json -w "%{http_code}" -X POST -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: application/json" -d "$BODY" "$API_URL" || echo "000")
             cat /tmp/resp.json; echo "HTTP $HTTP_CODE"
-            [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "409" ] || { echo "Release 失败 HTTP=$HTTP_CODE" >&2; exit 1; }
+            case "$HTTP_CODE" in
+              201|200) echo "已创建 $TAG_NAME（prerelease=$PRERELEASE）" ;;
+              409)
+                REL_ID=$(curl -s -H "Authorization: token $GITEA_TOKEN" "$API_URL/tags/$TAG_NAME" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>process.stdout.write(String(JSON.parse(s).id)))")
+                PATCH_CODE=$(curl -s -o /tmp/patch.json -w "%{http_code}" -X PATCH -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: application/json" -d "{\"prerelease\":$PRERELEASE}" "$API_URL/$REL_ID" || echo "000")
+                [ "$PATCH_CODE" = "200" ] || { cat /tmp/patch.json; echo "PATCH 失败 HTTP=$PATCH_CODE" >&2; exit 1; }
+                echo "Release 已存在，已校正 prerelease=$PRERELEASE" ;;
+              *) echo "Release 失败 HTTP=$HTTP_CODE" >&2; exit 1 ;;
+            esac
   ```
-- **API 形态**：`POST {server_url}/api/v1/repos/{owner}/{repo}/releases`，鉴权 `Authorization: token $GITEA_TOKEN`（`GITEA_TOKEN` 须 `env: GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}` 显式注入，不裸注入），payload `{tag_name,name,body,draft,prerelease}`，成功 `201`/`200`，已存在 `409` 幂等视为成功
+- **预发布标记 `prerelease`（按 tag 推导，禁止写死）**：
+  - Gitea **不会**根据 tag 名自动判断预发布，`prerelease` 必须显式传布尔值（缺省 `false`）
+  - `x.y.z-rc.1` / `-beta.2` / `-alpha` 等 SemVer 预发布 → `true`；`x.y.z` 正式版 → `false`；`0.x` 是开发阶段版本、`+build` 是构建元数据，都不算预发布
+  - `draft` 管**可见性**（未发布，外部不可见），`prerelease` 管**成熟度**（已发布但非生产可用）；两者独立，不要用 draft 代替 prerelease
+  - `GET .../releases/latest` 只返回**非 draft、非 prerelease** 的最新一条；标记正确后，rc 不会顶掉首页的稳定版
+  - 已存在 Release 返回 409 时，改标记要 `PATCH /repos/{owner}/{repo}/releases/{id}`（body `{ "prerelease": true }`）；重新 POST 不会改旧值
+  - 实测（Gitea 28.x）：创建 rc 后 `/releases/latest` 返回 404；补稳定版后 latest 指向稳定版；`?pre-release=true` 可筛出 rc；`PATCH {prerelease:false}` 可转正
+- **API 形态**：`POST {server_url}/api/v1/repos/{owner}/{repo}/releases`，鉴权 `Authorization: token $GITEA_TOKEN`（`GITEA_TOKEN` 须 `env: GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}` 显式注入，不裸注入），payload `{tag_name,name,body,draft,prerelease}`（`prerelease` 按 tag 推导，见上；勿写死），成功 `201`/`200`；已存在 `409` 时按 tag 查 id 并 `PATCH` 校正 `prerelease`，**不要静默跳过**
+- **验证预发布**：创建后 `GET .../releases?pre-release=true` 应包含 rc/beta；`GET .../releases/latest` 在只有预发布时返回 404、有稳定版时仍返回稳定版
 - **校验**：`github.server_url/repository/ref_name` 均在 `references/contexts.md` 常用属性表已列；用 `github.*` 可直接过 `actionlint`，无需 `-ignore`
 
 ## job 容器镜像与内置 action（Runner 5.x）

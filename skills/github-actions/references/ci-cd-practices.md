@@ -289,6 +289,14 @@ on:
 > **注意**：tag 触发时 checkout 处于 detached HEAD；若需回推必须 `git push origin HEAD:main`（详见 workflow-syntax.md 陷阱节）。
 > **Gitea 等价**：同样用 `push.tags` 或 `workflow_dispatch`；无 environment 门禁，用仓库分支保护 + 手动触发兜底。
 
+### 预发布与正式版（同一流水线）
+
+- **预发布是已发布的版本**：`prerelease: true`，外部可见但标记“非生产可用”；`draft: true` 是未发布、外部不可见。两者独立，不要用 draft 代替预发布。
+- **由 tag 推导，不写死**：`v1.2.3-rc.1` / `-beta.2` / `-alpha` → `prerelease: true`；`v1.2.3` → `false`；`0.x` 是开发阶段版本、`+build` 是构建元数据，都不算预发布。
+- **latest 语义**：GitHub 的 `make_latest` 不接受 draft/prerelease；Gitea `GET /releases/latest` 只取非 draft、非 prerelease。标记正确后，rc 不会顶掉稳定版。
+- **平台写法**：GitHub 用 `gh release create TAG --prerelease` 或 API `prerelease: true`；Gitea API 同名字段（见 `gitea-differences.md`）。
+- **转正/纠错**：用 `PATCH /repos/{owner}/{repo}/releases/{id}` 改 `prerelease`（GitHub 也可 `gh release edit TAG --prerelease=false`）；重复创建返回 409，不会覆盖旧标记。
+
 ### CHANGELOG 规范与版本治理（发版前必读）
 
 **速览**；完整规范见 **`references/changelog-conventions.md`**（Keep a Changelog 格式 + Conventional Commits + SemVer + 与流水线集成）。
@@ -327,6 +335,7 @@ on:
 - **生产部署无保护** → GitHub 用 environment 保护规则；Gitea 用分支保护 + 手动触发
 - **发版不看 CHANGELOG / 版本一致性** → tag、CHANGELOG、包版本三处不一致（单一版本源仓），产物与记录脱节；发版前整理 Unreleased 并核对一致性（见 changelog-conventions.md）
 - **CD 用 `git log` 拼 Release body 而非 CHANGELOG 该小节** → 违反 `changelog-conventions.md` 糟糕实践；Release 必须引用 CHANGELOG，`git log` 堆砌是噪音
+- **预发布当正式版发 / 正式版标成预发布** → `v1.2.3-rc.1` 必须 `prerelease:true`；`x.y.z` 与 `0.x` 不是预发布；latest 只认非 prerelease
 - **无视 CI 优化** → 流水线 10 分钟+ 且无任何优化动作，每次迭代都在烧时间
 - **把"能跑"当"设计对了"** → 语法正确只是底线；门禁完整、失败能反馈、发布可回退才是目标
 
@@ -350,5 +359,6 @@ on:
 - [ ] CI 失败会有人（人或 Agent）收到并修复，不靠 rerun 掩盖
 - [ ] 生产部署有手动/受控通道 + 保护（environment 或分支保护）
 - [ ] 发版流程含 CHANGELOG：Unreleased → 版本小节；单一版本源仓 tag/CHANGELOG/包版本三处一致（详见 changelog-conventions.md 落地清单）
+- [ ] 预发布 tag（`-rc`/`-beta`/`-alpha`）已置 `prerelease:true`，正式版为 `false`；没有用 draft 代替预发布
 - [ ] 流水线 ~10 分钟内；超时已做缓存 / 并行 / 路径过滤
 - [ ] `actionlint` 校验通过（用法见 SKILL.md「校验方法」）

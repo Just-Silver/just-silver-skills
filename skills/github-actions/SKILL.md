@@ -1,6 +1,6 @@
 ---
 name: github-actions
-description: Use when creating or editing GitHub Actions or Gitea Actions workflow YAML (.github/workflows/*.yml, .gitea/workflows/*.yml), choosing trigger events (push, pull_request, schedule, workflow_dispatch), writing expressions, contexts, permissions, or troubleshooting workflow syntax and CI failures on either platform.
+description: Use when creating or editing GitHub Actions or Gitea Actions workflow YAML (.github/workflows/*.yml, .gitea/workflows/*.yml), publishing releases (including pre-releases), choosing trigger events (push, pull_request, schedule, workflow_dispatch), writing expressions, contexts, permissions, or troubleshooting workflow syntax and CI failures on either platform.
 ---
 
 # GitHub / Gitea Actions 工作流编写
@@ -28,9 +28,9 @@ GitHub Actions 与 Gitea Actions 约 95% 语法通用（后者兼容前者）。
 | `github` / `secrets` / `needs` 等上下文 | `references/contexts.md` |
 | **Gitea 目标必读**：目录、token、权限、28.x/Runner 5.x 差异 | `references/gitea-differences.md` |
 | 质量门禁、CI 优化、部署策略 | `references/ci-cd-practices.md` |
-| CD/发版/Release（含 `push.tags` / `releases` API / `cd.yml`） | `references/ci-cd-practices.md` + `references/changelog-conventions.md` 必读（CHANGELOG 是输入，Release 引用它；**单一版本源仓** `tag==CHANGELOG==包版本` 一致性进流水线；monorepo/多制品仓先识别各自版本源，不强行统一） |
+| CD/发版/Release（含 `push.tags` / `releases` API / `cd.yml`、预发布 `-rc`/`-beta`/`-alpha`） | `references/ci-cd-practices.md` + `references/changelog-conventions.md` 必读（CHANGELOG 是输入，Release 引用它；**单一版本源仓** `tag==CHANGELOG==包版本` 一致性进流水线；`prerelease` 由 tag 推导、不得写死；monorepo/多制品仓先识别各自版本源，不强行统一） |
 
-> 凡文件含 `push.tags`、`releases` API、`CHANGELOG` 或任务含“发版/CD/Release”，必须走此分支；绕过即违规，`gitea-differences.md` 的 `git log` 演示不得覆盖本分支。
+> 凡文件含 `push.tags`、`releases` API、`CHANGELOG` 或任务含“发版/CD/Release/预发布(rc/beta/alpha)”，必须走此分支；绕过即违规，`gitea-differences.md` 的 `git log` 演示不得覆盖本分支。
 
 > 先确认平台：GitHub → 1-4；Gitea → 1-4 + `gitea-differences.md` 必读（**本技能只覆盖 Gitea 28.x + Runner 5.x**，默认按此编写；实例明显过旧或语法存疑时以对应版本官方文档为准，本文件只是速查）。
 
@@ -46,6 +46,8 @@ GitHub Actions 与 Gitea Actions 约 95% 语法通用（后者兼容前者）。
 - `secrets` 误用于 `if`、`pull_request_target` 滥用、tag 回推忘 `HEAD:main`
 - 硬编码 `http://server:3500` / 固定 `owner/repo` → 用 `${{ github.server_url }}/${{ github.repository }}/${{ github.ref_name }}` 动态拼接（`gitea-differences.md` Release/回推通用模板，push 需去协议头）
 - 发版流水线未校验 `tag == CHANGELOG == package.json`（**单一版本源仓**；monorepo/多制品按各自版本源）或 Release body 非来自 `CHANGELOG.md`（见 `changelog-conventions.md` 一致性卡点）→ CD 发版必须从 `CHANGELOG.md` 该版本小节提取 body，`git log` 堆砌属违规
+- 发版 payload 把 `prerelease` 写死为 `false` → 预发布 tag（`v1.2.3-rc.1` / `-beta.2` / `-alpha`）必须 `true`；`x.y.z` 与 `0.x` 不是预发布；`draft`（未公开）≠ `prerelease`（已公开但非生产可用），别互相替代
+- 409 只当幂等成功、不核对旧 Release 的标记 → 重新 POST 不会改旧值；标记错了须 `PATCH /repos/{owner}/{repo}/releases/{id}` 更新 `prerelease`
 - 带 `git push` 回推的 workflow 用 `cancel-in-progress: true` 或各用不同 `group` 名 → 取消丢提交 / 照样 push 冲突；须多个 workflow 共用同一 `group` 名 + `cancel-in-progress: false` 排队（见 `ci-cd-practices.md`「多 workflow 回推排队」）
 
 ## 发版（CD）落地清单
@@ -55,3 +57,5 @@ GitHub Actions 与 Gitea Actions 约 95% 语法通用（后者兼容前者）。
 - [ ] `CHANGELOG.md` 存在且顶部有 `## [Unreleased]`，发版前已整理为 `## [x.y.z] - YYYY-MM-DD`（见 `references/changelog-conventions.md`）
 - [ ] CD 含 `tag == CHANGELOG == package.json` 一致性校验（**单一版本源仓**），不一致即 fail
 - [ ] Release body 来自 `CHANGELOG.md` 该版本小节截段，非 `git log` 堆砌（模板见 `references/gitea-differences.md`「Gitea Release 发布」）
+- [ ] `prerelease` 由 tag 推导：`x.y.z-<预发布标识>` → `true`，`x.y.z` → `false`；tag 触发的自动发版 `draft:false`（draft 只用于先传附件再发布的手动流程）
+- [ ] 预发布不会顶掉稳定版：`GET .../releases/latest` 仍指向上一个稳定版；需要转正时用 `PATCH` 改 `prerelease`，不靠重新创建
