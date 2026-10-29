@@ -39,7 +39,7 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 ## 技术栈基线（统一约定，除非项目已明确另选）
 
 - **DI 容器**：一律 **Microsoft.Extensions.DependencyInjection**（经 `Host.CreateApplicationBuilder` / `Host.CreateDefaultBuilder` 或 `ServiceCollection`）；**不引入** Autofac / Unity / Prism 等第三方容器，也不自研容器。
-- **基础设施**：优先 **Microsoft.Extensions.\*** 官方包——`Hosting`、`Configuration.*`、`Options.*`、`Logging.*`、`Http`（`IHttpClientFactory`）、`Http.Resilience`、`Caching.*`、`DependencyInjection`。日志、配置、HTTP、缓存、健康检查都走这些抽象。
+- **基础设施**：优先 **Microsoft.Extensions.\*** 官方包——`Hosting`、`Configuration.*`、`Options.*`、`Logging.*`、`Http`（`IHttpClientFactory`）、`Http.Resilience`、`Caching.*`、`DependencyInjection`。日志、HTTP、缓存、健康检查都走这些抽象；**配置走项目既有的配置封装**——桌面客户端装了 `Common` 一律用 `ConfigBase<T>` + `AllConfig`，没有该库时应用级配置才用 Options（见 `references/framework-practices.md` 第 2 节）。
 - **MVVM**：一律 **CommunityToolkit.Mvvm**；`[ObservableProperty]` **必须**用 partial property 新写法 `public partial string? Name { get; set; }`，**禁止**旧字段式 `private string? _name;`。详见 `references/mvvm-communitytoolkit.md`。
 - **对象映射**：一律 **Mapster**——实体 / 领域模型 ↔ DTO、API 契约之间**不手写逐属性赋值**。Mapster **开箱即用**：成员同名同类型时零配置（含嵌套、集合、record），**只在需要计算字段 / 改名 / 忽略 / 写回等自定义规则时**才写 `IRegister` 配置。详见 `references/object-mapping.md`。
 - **时间/测试**：时间用 `TimeProvider`；测试用 `Microsoft.Extensions.TimeProvider.Testing`。
@@ -61,7 +61,7 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 | 场景 | 读取 |
 |------|------|
 | 核心原则、SOLID、抽象/继承、模式取舍、开发顺序、审查标准 | `references/design-principles.md` |
-| DI 生命周期、Options、`ILogger<T>`、`IHttpClientFactory`、异常、async、数据访问 | `references/framework-practices.md` |
+| DI 生命周期、Options、用户设置载体、`ILogger<T>`、`IHttpClientFactory`、异常、async、数据访问 | `references/framework-practices.md` |
 | **对象映射**：实体 ↔ DTO / API 契约、写回实体、`ProjectToType` 投影、需要自定义规则时才写配置 → **命中即读** | `references/object-mapping.md` |
 | WPF / WinForms / Avalonia / 控制台 / Worker 的 Composition Root、组装与项目结构 | `references/app-composition.md` |
 | **MVVM（任何 UI 框架）**：写 / 改任一视图（XAML/AXAML/code-behind）、ViewModel、数据绑定、`ICommand` 或输入校验 → **命中即读，先读本行**（不等“按需”） | `references/mvvm-communitytoolkit.md` |
@@ -104,7 +104,9 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 | 为架构而架构：无实际用途的 `Factory`/`Handler`/`Wrapper`/`BaseService`/`Repository` 层 | 增加跳转层级与维护成本，收益为零 | 简单实现能解决就不加中间层；出现第二实现/变化点再加 |
 | `Singleton` 捕获 `Scoped`/`Transient` 依赖（captive dependency） | 短生命周期被提升为单例，串请求状态 | 按实际生命周期注册，长生命周期服务不得捕获更短的依赖；若被捕获的是可释放 `Transient`，属红区 1 |
 | `Console.WriteLine` / 直接依赖具体日志实现 | 无结构、无法分级过滤、业务耦合基础设施 | 注入 `ILogger<T>`，结构化日志 |
-| `Environment.GetEnvironmentVariable` 散读配置 | 魔法字符串、无校验、无法热更新 | Options 强类型绑定 + 校验 |
+| `Environment.GetEnvironmentVariable` 散读配置 | 魔法字符串、无校验、无法热更新 | 走项目既有的配置封装（桌面端装 `Common` 必须用 `ConfigBase<T>`，否则应用级配置用 Options 强类型绑定 + 校验）；判据见 `references/framework-practices.md` 第 2 节 |
+| 用户可编辑设置做成 `IOptions<T>` / 绑在启动期配置上 | 启动即冻结，改完不生效；没有暂存/取消语义，界面也绑不了 | 可通知配置模型 + 配置文件封装（桌面端装 `Common` 用 `ConfigBase<T>`）；Options 只用于应用级装配配置 |
+| 凭印象调用项目既有库的 API（配置封装、基础设施库） | 成员名/构造方式猜错，编译不过或语义用反（如把暂存副本当生效值） | 先读该库源码与该类型 XML 注释/README，再写调用 |
 
 > **Service Locator 的例外**：组合根 / 框架适配层（无法构造函数注入，如应用基类按运行时类型解析主窗口、导航按类型解析页面）可持有 `IServiceProvider`，但**必须在 XML 注释写明理由**；业务代码仍一律禁止（构造函数注入 / 抽象工厂 / 策略）。
 
@@ -129,7 +131,9 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 - [ ] 外部依赖（DB/HTTP/时间/文件）是否可替换、可单测？
 - [ ] 实体 ↔ DTO 转换是 `mapper.Map` / `ProjectToType`（纯同构不必写配置），还是散落的手写逐属性赋值？
 - [ ] 异常是否被真正处理或向上抛出，而非静默吞掉？
-- [ ] 配置走 Options、日志走 `ILogger<T>` 了吗？
+- [ ] 配置是否走项目既有的配置封装（桌面端装 `Common` 必须用 `ConfigBase<T>` + `AllConfig`），而不是散读环境变量 / 自建存储 / `IOptions<T>`？
+- [ ] 调用该库 API 前是否读过源码/README，而不是凭印象猜成员名？
+- [ ] 用户设置的绑定属性是按“立即生效 / 应用后生效”的语义选的，而不是随手默认一个？
 
 **涉及 UI / MVVM 时追加（视图、ViewModel、命令、绑定、校验有改动就跑一遍）：**
 

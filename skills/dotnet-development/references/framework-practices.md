@@ -181,7 +181,31 @@ builder.Services.AddOptions<OrderApiOptions>()
 
 `IOptions<T>.Value` 是启动时冻结的快照；需要热更新时用 Snapshot/Monitor。
 
+> 桌面/控制台没有框架自动开的 scope：`IOptionsSnapshot<T>` 是 **Scoped**，从根容器解析会抛 `Cannot resolve scoped service from root provider`，基本不可用。`IOptionsMonitor<T>` 要热更新还得自己把设置文件挂成 `reloadOnChange` 的 `IConfiguration` 源——用户设置别往这条路上走。
+
 **Options 属于应用级装配层**：进程级、随应用装配、全应用共享，**与用户侧设置无关，与 MVVM 无关**——用户可编辑的设置由可通知的配置模型承载，不要塞进 Options。
+
+### 用户设置的载体（桌面/客户端必读）
+
+用户可编辑的设置**不走 Options**，用「可通知配置模型 + 配置文件封装」：配置模型是 `ObservableObject` + 偏属性（只有确实需要通知时才上 `[ObservableProperty]`，见 `mvvm-communitytoolkit.md`），外面套一层负责加载/落盘/变更即存的封装。封装至少要给到这几件事，缺一件就是自己重造轮子：
+
+- **落盘**：序列化到用户可写目录，写失败**不静默**（事件或日志，见红区 2）
+- **生效值 / 暂存副本**：两者语义不同，得能同时提供
+- **变更即存**：可合并落盘（防抖），而不是每次 setter 都同步写盘
+- **释放边界**：停掉计时器并写出待写变更
+
+**界面绑哪个属性，看生效时机，不存在默认值：**
+
+| 语义 | 绑什么 |
+|------|--------|
+| 改完**立即生效**（选中即变色、勾选即开关） | 直接绑生效值，变更即存 |
+| 改完**点应用/保存才生效**，取消要整体丢弃 | 绑暂存副本，保存时一次性提交、取消时丢弃 |
+
+两点前提：**取消 = 从已提交值整体重建**，不要逐字段回滚（新增字段会漏）；配置对象会在加载/保存时被整体替换，**订阅变更要用封装层暴露的配置级事件**，手写订阅内层对象的 `PropertyChanged` 会在替换后静默失效。
+
+> **桌面客户端（WPF / Avalonia / WinForms 等）装了 `Common`（`Common.Wpf`）的项目，配置一律走 `ConfigBase<T>` + `AllConfig` 聚合入口，没有例外**——`Common.Configuration.FileConfig.ConfigBase<T>` 是库提供的配置封装，`AllConfig` 是**项目自建的聚合入口**（模板与既有项目里都是这个形状：构造时逐个 `new ConfigBase<T>(nameof(X))` + `LoadOrInitialize()`，注册成单例）。**用户设置与基础配置（连接串、端点这类）都用它**，不要另外引入 Options 或自建存储层。
+>
+> **用之前先读该库的 `ConfigBase.cs` 与 `Common.Wpf/README.md`**：成员名、构造方式、生效值与暂存副本的语义**以源码为准，不要凭印象臆造 API**。绑哪个按上表判据选。
 
 ## 3. 日志（结构化 + `ILogger<T>`）
 

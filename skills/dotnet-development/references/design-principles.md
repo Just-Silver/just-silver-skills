@@ -206,7 +206,9 @@ public interface IPricingStrategy
 
 ## 配置
 
-配置通过 .NET Configuration / Options 机制管理。避免业务代码直接读 `Environment.GetEnvironmentVariable(...)`，也不要把配置散落在大量静态字段中。需要配置时优先使用强类型 Options。
+配置分两类，载体不同、不要混用：**应用级 / 装配期配置**（连接串、API 基址、日志级别这类随部署走的）与**用户可编辑设置**（用户改、要持久化、要绑定界面）。避免业务代码直接读 `Environment.GetEnvironmentVariable(...)`，也不要把配置散落在大量静态字段中；用户设置不能做成 `IOptions<T>`（启动即冻结、没有暂存/取消语义、绑不了界面）。
+
+**桌面客户端（WPF / Avalonia / WinForms 等）装了 `Common`（`Common.Wpf`）的项目，两类配置一律走 `ConfigBase<T>` + `AllConfig`**；没有该库时应用级配置才用 .NET Configuration / Options。两类的判据、封装要求与「界面绑哪个属性」的选择依据见 `framework-practices.md` 第 2 节「用户设置的载体」（此处不复述，避免两处漂移）。
 
 ## 数据访问
 

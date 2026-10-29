@@ -82,6 +82,8 @@ builder.Services.AddSingleton<MainWindow>();
 _host = builder.Build();
 ```
 
+> 桌面客户端装了 `Common` 的项目：**配置一律走 `ConfigBase<T>` + `AllConfig`**（用户设置与连接串/端点这类基础配置都一样），注册成 `Singleton` 由 VM 构造注入；上面 `AddOptions` 那段只留给**没有** `Common` 又需要应用级装配配置的项目。判据与封装要求见 `framework-practices.md` 第 2 节「用户设置的载体」。
+
 > 两者默认行为**等价**；新项目推荐 `Host.CreateApplicationBuilder`（`CreateDefaultBuilder` 是传统回调式，用于兼容旧代码）。
 
 ### 注入窗口与 ViewModel
