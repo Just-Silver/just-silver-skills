@@ -26,6 +26,7 @@
 
 - 每个技能必须有 frontmatter（name + description）+ 明确行为指令（When to Use / 禁止事项 / 触发边界）
 - **`description` 是唯一触发入口，必须写硬触发词**（"before writing implementation code"、"when a build fails" 这类可判定场景）；"风险高时""值得的时候""任何多文件改动"这类软判断在 catalog 竞争里打不过硬触发技能，等于没装——本仓库 2026-09-30 因此整体删除了 sdlc 技能组
+- **`description` 写一句话即可，别堆关键词清单**：堆长词表买到的是"用户措辞碰巧和词表重合才触发"，触发与否取决于运气而非任务性质。2026-11-03 实测（旧 830 字符版 vs 一句话版）：给子代理一个 `BackgroundService` 里从根容器解析可释放瞬态的编码任务——业务描述里没有 background/lifetime 这些字样，旧长版**没触发**，正文那 4 条红区一条没被读到；而措辞与词表字面重合的 MVVM 任务触发了。判据是任务本身是不是该技能的领域（"任意 C# / .NET 代码"就够），不要靠列举项目类型/反模式来"提高命中"
 - 行为规则写成"默认 + 例外"，避免把个人习惯写成无条件的绝对律令；触发靠 `description` + `When NOT to use` 让模型自行判断，不建硬路由矩阵
 - 示例：bootstrapblazor 禁止臆造组件 API，必须 `bb-llms --help` 验证可用性后用 `get/search/list` 查官方文档；bb-llms 未装时只提示用户手动安装，**不得自行 dotnet tool install、不得臆造**
 

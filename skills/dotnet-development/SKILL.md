@@ -1,6 +1,6 @@
 ---
 name: dotnet-development
-description: Use when writing, modifying, or reviewing C# / .NET code in any project type (ASP.NET Core, WPF, WinForms, Avalonia, MAUI, Blazor, console, worker, class library) — designing classes and services, registering or resolving dependencies, choosing service lifetimes, diagnosing memory/handle growth in long-running or background services, structuring modules/layers, building MVVM ViewModels with CommunityToolkit.Mvvm, deciding whether an abstraction or design pattern is warranted, mapping entities to DTOs or API contracts — or when about to introduce a service locator, a god class, an abstraction "for architecture's sake", a hand-written INotifyPropertyChanged / ICommand / property-change UI wiring, or property-by-property entity↔DTO conversion, instead of the CommunityToolkit.Mvvm source generators and Mapster.
+description: Use when writing, modifying, or reviewing C# / .NET code in any project type.
 ---
 
 # .NET 开发规范
