@@ -50,17 +50,47 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 - 编写 / 修改 / 审查任意 C# / .NET 代码（含 Web、桌面、控制台、类库、后台服务）
 - 写 / 改 ViewModel、XAML 数据绑定、`ICommand`，或需要在属性变化时联动 UI（**必读** `references/mvvm-communitytoolkit.md`，先看下方「特性速查」定位）
 - 设计类、服务、模块分层；注册或解析依赖；选择 `Singleton` / `Scoped` / `Transient`
+- **实现一个业务流程 / 用例**（要串起多个服务、带顺序、条件或失败口径）——命中即读下方「归谁」
+- **决定一个行为放对象里还是抽服务**（实体只剩 get/set、规则浮在外部 Service 里）——命中即读下方「归谁」
 - 实体 / 领域模型 ↔ DTO / API 契约的转换（**必读** `references/object-mapping.md`），或正在写逐属性赋值的映射代码
 - 纠结“要不要抽接口 / 上工厂 / 建继承体系 / 拆服务 / 用某个设计模式”
 - 重构、代码审查，或排查“难测试 / 难维护 / 改动牵连大”的设计
 
 **不适用**：非 .NET 技术栈；纯格式/命名等风格细节（见 `references/design-principles.md` 末节）。
 
+## 归谁：对象 / 能力服务 / 编排（写任何业务逻辑前先过这一关）
+
+业务逻辑（属性 / 规则 / 流程）该放谁身上，判据只有一条：**它认识哪些状态。** 三类归宿：
+
+| 认什么状态 | 归宿 | 例子 |
+|------|------|------|
+| **只认自己的状态** | 领域对象（方法/属性，非外部过程代码） | `order.Cancel()`、`project.Rename(name)` —— 不写成 `orderService.Cancel(order)` |
+| **只做一件技术事，不认识业务状态** | 业务能力服务 | `IExcelReader.Read(path)`、`IFileStore.Save(...)`、`IPdfRenderer` |
+| **要串≥2 个协作者**（带顺序 / 条件 / 失败口径） | 应用服务（编排） | `ImportOrdersService.ExecuteAsync(path)` |
+
+**判断顺序**：先问「这个行为能不能只在某个对象自己的状态上完成？」，能就放对象；不能、但只做一件事，就做能力服务；**仍然不能**，说明要串多个协作者，才抽编排。**跳过判断、一律往服务里塞，结果就是贫血模型 + 过程式代码。**
+
+典型用例（导入订单、提交表单、打开配方）通常落在第三类，但**别按名字套**：只有一格对不上就走它对应那一格。
+
+| 位置 | 负责 | 禁止 |
+|------|------|------|
+| **入口**（ViewModel / 命令 / 事件处理器 / Controller / 后台循环） | 取输入 → 调那个具名对象**一次** → 按结果更新自身状态 | 自己按顺序调多个服务；自己写跨服务的条件分支与失败回滚；把流程复制进每个入口 |
+| **应用服务**（编排） | 执行顺序、用例级条件、事务/补偿、失败口径、结果类型 | 重复实现底层服务已有的能力；自己实现本属领域对象的业务规则 |
+| **业务能力服务** | 一项明确、可独立调用的能力 | 一个类塞多个无关能力（`XxxManager` 里 Create/Save/Export/Import/Sync）；把只认对象自身状态的业务规则搬进来 |
+| **领域对象** | 自身状态、不变量与业务规则 | 承担跨对象协作；依赖服务/IO |
+
+**「建了个类」不等于封装完成**：命名用 `XxxService`/`XxxManager` 却只是把一串 `await` 装起来，既不是能力服务（意图不单一）也不是编排（没有用例语义），只是换了个位置的过程式代码。
+
+**反向闸（同样硬）**：只有**一次同职责转发**（无顺序、无条件、无失败口径）时**不许**为它包一层；没有第二实现与变化点时不抽接口；**实体只要状态与规则、不要服务**。**该抽而不抽**（过程式堆积）与**不该抽而抽**（转发层/接口泛滥/每个实体配一个 Service）是两面，两个方向都要挡。
+
+**构造函数依赖数量不是判据**：入口注入很多协作者未必是错——子视图模型、配置聚合根、宿主抽象都合法占位。判据只看一件事：**有没有跨协作者的顺序 / 条件 / 失败口径被留在了入口里**。长文件同理，除非那份流程确实属于入口。
+
 ## 路由（MVVM 命中即读；其余按需，不要全读）
 
 | 场景 | 读取 |
 |------|------|
 | 核心原则、SOLID、抽象/继承、模式取舍、开发顺序、审查标准 | `references/design-principles.md` |
+| **跨对象协作的具体取舍**（编排该不该抽、行为该归对象还是服务、入口该留什么、§「面向对象设计」/§「跨对象的协作编排」） → 与上方「归谁」配套 **命中即读** | `references/design-principles.md` |
 | DI 生命周期、Options、用户设置载体、`ILogger<T>`、`IHttpClientFactory`、异常、async、数据访问 | `references/framework-practices.md` |
 | **对象映射**：实体 ↔ DTO / API 契约、写回实体、`ProjectToType` 投影、需要自定义规则时才写配置 → **命中即读** | `references/object-mapping.md` |
 | WPF / WinForms / Avalonia / 控制台 / Worker 的 Composition Root、组装与项目结构 | `references/app-composition.md` |
@@ -100,6 +130,9 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 | 手写实体 ↔ DTO 转换：逐属性 `new Dto { X = e.X }`、查询里逐字段 `Select` 拷贝、每对类型一个 `ToDto()`/`XxxMapper` | 属性改名不报错、新增字段静默漏、重复代码逐处漂移；漏字段要到线上才发现 | **Mapster**：默认**零配置**直接 `mapper.Map<T>()`（同名成员自动对齐，含嵌套/集合）；只有派生字段、改名、忽略、写回等自定义规则才加一条 `NewConfig`。见 `references/object-mapping.md` |
 | 应用/业务层直接依赖 `DbContext`、`SqlConnection`、`HttpClient`、`DateTime.Now`、文件系统 | 高层耦合具体基础设施 | 通过接口/边界接入；时间用 `TimeProvider`，HTTP 用 `IHttpClientFactory` |
 | 万能类：`XxxManager` / `XxxHelper` / `XxxUtil` / 超长 `Service` | 职责发散，一个类多个变化原因 | 按职责拆分，让行为回到所属对象 |
+| **贫血模型 + 外部过程代码**：实体只有 get/set，业务规则全在 `XxxService` 里对实体读写（`orderService.Cancel(order)`），或每个实体各配一个 `XxxService` 只做转发 | 对象退化成数据袋，规则脱离它约束的状态、可被任意入口绕过；实例级不变量无处安放，只能靠调用方自觉 | **只认自身状态的行为放回对象**（`order.Cancel()`）；服务只做它不认识业务状态的那件事。判据见上方「归谁」 |
+| **入口自行编排业务流程**：ViewModel / 命令 / 事件处理器 / Controller 里按顺序 `await` 多个服务（读文件 → 校验 → 存库 → 重建索引），自己写跨服务的条件分支与失败回滚 | 流程被复制进每个入口、入口随用例膨胀，改一步要改 N 处；入口同时为「界面」和「流程」两个原因变化；无法单独测试或复用这条用例 | 抽应用层**具名对象**（`ImportOrdersService`），入口只调它一次、按结果更新自身状态。判据见上方「归谁」 |
+| **把「建了一个类」当成封装完成**：`ProjectManager` 里 Create / Save / Export / Import / Sync 并列，一个类同时是业务服务和编排 | 过程式代码只是从入口搬进了另一个类，职责仍混在一起；改某一用例要动这个公共类，牵连无关功能 | 按业务能力拆成各自的服务；**要串多个能力的用例**再单独给一个编排对象（编排不寄生在能力服务里） |
 | 每个类都造 `IXxx` + `Xxx` | 只为“像 DI”而加文件，无替换价值 | 只在真实边界/可替换/可测试处抽接口 |
 | 为架构而架构：无实际用途的 `Factory`/`Handler`/`Wrapper`/`BaseService`/`Repository` 层 | 增加跳转层级与维护成本，收益为零 | 简单实现能解决就不加中间层；出现第二实现/变化点再加 |
 | `Singleton` 捕获 `Scoped`/`Transient` 依赖（captive dependency） | 短生命周期被提升为单例，串请求状态 | 按实际生命周期注册，长生命周期服务不得捕获更短的依赖；若被捕获的是可释放 `Transient`，属红区 1 |
@@ -113,7 +146,7 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 ## 开发顺序（正向配方）
 
 ```
-理解职责 → 明确对象与边界 → 明确依赖 → 通过 DI 组装 → 实现业务行为 → 保持对象内聚 → 再考虑扩展性
+理解职责 → 明确用例与它的具名归属 → 明确对象与边界 → 明确依赖 → 通过 DI 组装 → 实现业务行为 → 保持对象内聚 → 再考虑扩展性
 ```
 
 **不要**先建一堆目录、接口和抽象，再去找它们存在的理由。
@@ -124,8 +157,10 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 - [ ] 有类在内部 `new` 外部业务依赖吗？
 - [ ] 有隐藏依赖：Service Locator、全局静态状态、静态可变字段？
 - [ ] 有职责过多的类 / 过大的接口 / 超长方法？
-- [ ] 有本该属于对象、却被塞进外部 Service 的业务逻辑？
+- [ ] 有本该属于对象、却被塞进外部 Service 的业务逻辑？（只认对象自身状态的规则留在对象里，别做成贫血模型）
 - [ ] 有为了模式而模式的抽象层（无第二实现、无变化点）？
+- [ ] **本次实现的业务用例有没有具名的归属对象？**（涉及多个协作者、带顺序/条件/失败口径时必须有）
+- [ ] **入口（VM / 命令 / 事件处理器 / Controller）是在自己编排流程，还是只调一次用例？**
 - [ ] 生命周期选择是否与依赖生命周期匹配？有无 captive dependency？
 - [ ] 循环 / `Timer` / 后台服务里，是否从根容器解析了实现 `IDisposable` 的瞬态对象？（会被强引用到进程退出；手动 `Dispose` 救不了）
 - [ ] 外部依赖（DB/HTTP/时间/文件）是否可替换、可单测？
@@ -150,3 +185,4 @@ description: Use when writing, modifying, or reviewing C# / .NET code in any pro
 - **DI = 万物接口化**：接口只表达真实抽象与边界，不是文件数量竞赛。
 - **桌面/控制台项目没有 Composition Root**：WPF/Avalonia/WinForms/控制台同样应有一个组装点（Generic Host 或 `ServiceCollection`），详见 `references/app-composition.md`。
 - **只关注“能跑”**：设计时就考虑依赖可替换、时间可控制、IO 可隔离、规则可独立测试。
+- **“建了个类”就算封装完了**（最高频的退化）：把一串 `await` 塞进 `XxxManager`，既没有单一业务能力、也没有用例归属，只是把过程式代码从入口搬到了另一个类。检查方式：这个类里有几个**互不相关**的业务意图？多于一个就不是能力服务。反过来，实体只剩 get/set、规则全在服务里对实体读写，是同一个病的另一面（贫血模型）——两块都要看。
