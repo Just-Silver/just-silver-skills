@@ -190,7 +190,6 @@ builder.Services.AddOptions<OrderApiOptions>()
 用户可编辑的设置**不走 Options**，用「可通知配置模型 + 配置文件封装」：配置模型是 `ObservableObject` + 偏属性（只有确实需要通知时才上 `[ObservableProperty]`，见 `mvvm-communitytoolkit.md`），外面套一层负责加载/落盘/变更即存的封装。封装至少要给到这几件事，缺一件就是自己重造轮子：
 
 - **落盘**：序列化到用户可写目录，写失败**不静默**（事件或日志，见红区 2）
-- **生效值 / 暂存副本**：两者语义不同，得能同时提供
 - **变更即存**：可合并落盘（防抖），而不是每次 setter 都同步写盘
 - **释放边界**：停掉计时器并写出待写变更
 
@@ -203,9 +202,9 @@ builder.Services.AddOptions<OrderApiOptions>()
 
 两点前提：**取消 = 从已提交值整体重建**，不要逐字段回滚（新增字段会漏）；配置对象会在加载/保存时被整体替换，**订阅变更要用封装层暴露的配置级事件**，手写订阅内层对象的 `PropertyChanged` 会在替换后静默失效。
 
-> **桌面客户端（WPF / Avalonia / WinForms 等）装了 `Common`（`Common.Wpf`）的项目，配置一律走 `ConfigBase<T>` + `AllConfig` 聚合入口，没有例外**——`Common.Configuration.FileConfig.ConfigBase<T>` 是库提供的配置封装，`AllConfig` 是**项目自建的聚合入口**（模板与既有项目里都是这个形状：构造时逐个 `new ConfigBase<T>(nameof(X))` + `LoadOrInitialize()`，注册成单例）。**用户设置与基础配置（连接串、端点这类）都用它**，不要另外引入 Options 或自建存储层。
+> **桌面客户端（WPF / Avalonia / WinForms 等）装了 `Common`（`Common.Wpf`）的项目，配置一律走 `ConfigBase<T>` + `AllConfig` 聚合入口，没有例外**——`ConfigBase<T>` 是库提供的配置封装，`AllConfig` 是项目自建的聚合入口（注册成单例）。**用户设置与基础配置（连接串、端点这类）都用它**，不要另外引入 Options 或自建存储层。
 >
-> **用之前先读该库的 `ConfigBase.cs` 与 `Common.Wpf/README.md`**：成员名、构造方式、生效值与暂存副本的语义**以源码为准，不要凭印象臆造 API**。绑哪个按上表判据选。
+> **用法以该库的源码 / 包页 README 为准**：成员名与语义不要凭印象臆造。绑哪个按上表判据选。
 
 ## 3. 日志（结构化 + `ILogger<T>`）
 
