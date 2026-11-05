@@ -204,7 +204,7 @@ builder.Services.AddOptions<OrderApiOptions>()
 
 > **桌面客户端（WPF / Avalonia / WinForms 等）装了 `Common`（`Common.Wpf`）的项目，配置一律走 `ConfigBase<T>` + `AllConfig` 聚合入口，没有例外**——`ConfigBase<T>` 是库提供的配置封装，`AllConfig` 是项目自建的聚合入口（注册成单例）。**用户设置与基础配置（连接串、端点这类）都用它**，不要另外引入 Options 或自建存储层。
 >
-> **用法以该库的源码 / 包页 README 为准**：成员名与语义不要凭印象臆造。绑哪个按上表判据选。
+> **用法以该库的源码（含 `///` XML 注释）/ 包页 README 为准**：成员名与语义不要凭印象臆造。绑哪个按上表判据选。
 
 ## 3. 日志（结构化 + `ILogger<T>`）
 
