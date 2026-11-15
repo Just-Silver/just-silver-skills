@@ -1,6 +1,6 @@
 ---
 name: dotnet-development
-description: Use when writing, modifying, or reviewing C# / .NET code in any project type.
+description: Use for C#/.NET development tasks, including architecture, implementation, refactoring, and code review. Only apply to .NET-related work.
 ---
 
 # .NET 开发规范
