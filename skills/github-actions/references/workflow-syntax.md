@@ -58,7 +58,7 @@
   - `environment` 类型用于选择仓库已配置的 Environment，`inputs.<name>` 得到环境名字符串；**是否施加保护规则仍取决于 job 级 `environment:`**（输入本身不等于环境门禁）
   - `options` 仅对 `choice` 合法；给其他类型写 `options` 会使 workflow 无效
   - 输入在 `${{ inputs.<name> }}` 中读取；`github.event.inputs` 中同值但全部转成字符串（`boolean` 也不会保留布尔类型）
-  - **Gitea 28.4 无 Environments 概念**：`type: environment` 不会被识别为环境选择（28.4 Web 表单只特判 `choice` / `boolean` / `number`，其余按文本框），也没有环境保护规则；实测 28.4.0 可解析并通过 API 传值，但没有环境语义。Gitea 目标用 `string` / `choice`，门禁用 `if` + 分支保护
+  - **Gitea 28.4 无 Environments 概念**：`type: environment` 不会被识别为环境选择（28.4 Web 表单只特判 `choice` / `boolean` / `number`，其余按文本框），也没有环境保护规则；Gitea 会把它当普通字符串处理，没有环境语义。Gitea 目标用 `string` / `choice`，门禁用 `if` + 分支保护
 - `workflow_call`：可复用工作流，定义 `inputs`（必带 `type`）、`outputs`、`secrets`
 - `workflow_run`：在其他 workflow 完成/请求后触发，如 `on.workflow_run.workflows: ["Build"]`
 
@@ -146,7 +146,7 @@
 | `actions/cache` | 依赖缓存 | `@v6` | `path`、`key`（常配 `hashFiles()`） |
 | `softprops/action-gh-release` | 创建 GitHub Release | `@v3` | `tag_name`、`name`、`body_path` |
 
-> **版本核对（2026-11-20 经 `gh api repos/<owner>/<repo>/releases/latest` 实测）**：以上"常用版本"即各 action 的**当前最新 major**。写新 workflow 前建议再复核（major 可能已升级），并看 release notes 确认参数无破坏性变更。个别 action 最新 major 与文档不符时以实测为准并更新本表。**不要因为看到新 major 就批量升级**：Gitea 侧还要核对目标 Runner 的 Node 运行时与镜像兼容性。
+> **版本核对**：以上"常用版本"为各 action 的当前最新 major。写新 workflow 前复核 release notes 确认参数无破坏性变更；**不要因为看到新 major 就批量升级**：Gitea 侧还要核对目标 Runner 的 Node 运行时与镜像兼容性。个别 action 的 major 与文档不符时，以官方 release 为准并更新本表。
 
 ### 写 job output 的标准方式
 

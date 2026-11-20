@@ -4,7 +4,7 @@
 > 官方源（Release API）：https://docs.gitea.com/api/operations/repo-create-release/ （创建/编辑字段 `prerelease`）
 > 本文件是同一技能内 GitHub references 的 **Gitea 补充差异文件**；GitHub 侧语法详见同目录其余文件。
 > **定位**：本文件是维护者提炼的**常见差异速查，不是版本能力的最终权威**；与官方文档冲突时**以官方文档为准**。语法/权限/版本能力存疑时应主动核对 docs.gitea.com 对应版本文档与 Gitea/Runner 发布说明，允许并鼓励 Agent 查证。
-> **版本基线（2026-11-20 核对）**：Gitea Server **28.4.0**（2026-11-15 发布）+ Gitea Runner **6.0.0**（2026-11-11 发布）。Gitea 已去掉历史 `1.` 前缀（28.0.0 = 原 1.28.0）。**基线之外的版本（更旧的 28.x / 1.x，或 Runner 6.0.0 之前的版本）不默认保证**：目标是旧版本时必须查该版本官方文档核验能力，不要套用本文。
+> **版本基线**：Gitea Server **28.4.0** + Gitea Runner **6.0.0**。Gitea 已去掉历史 `1.` 前缀（28.0.0 = 原 1.28.0）。**基线之外的版本（更旧的 28.x / 1.x，或 Runner 6.0.0 之前的版本）不默认保证**：目标是旧版本时必须查该版本官方文档核验能力，不要套用本文。
 
 ## 第一步：确认目标平台（硬性）
 
@@ -55,8 +55,8 @@
 
 - Gitea 28.4 支持 workflow 级与 job 级 `concurrency` 的 `group` / `cancel-in-progress`（含表达式），同名 group 跨 workflow 互斥
 - **不支持 `queue`**（`single` / `max` 均无；`queue: max` 仍是 open proposal，go-gitea/gitea#39195）。行为等同 GitHub 默认 `queue: single`：running 不被取消，只保留一个 pending，新 pending 替换旧 pending
-- **实测（2026-11-20，Gitea 28.4.0 + Runner 6.0.0，临时仓库）**：`queue: max` 被接受但不生效；连续触发 3 次，只保留 1 个 running + 1 个 pending，中间 pending 被取消，最后一个 pending 在 running 结束后才执行——确认不能照搬 GitHub `queue: max`
-- **实测 `cancel-in-progress: true`**：同组已有 run 在运行时再次触发，旧 run 被取消（`cancelled`），新 run 接替执行；与文档语义一致
+- `queue: max` 即使写入也不生效：Gitea 只保留一个 pending，后来的 pending 会替换旧的 pending；需要多任务排队时合并 workflow 或自行重试
+- `cancel-in-progress: true`：新触发会取消同组正在运行的 run；设为 `false` 时 running 不会被取消，但 pending 仍只保留一个
 - Gitea 目标不要写 `queue: max` 期待多 pending；需要多个回推串行时合并 workflow 或自行重试（见 `ci-cd-practices.md`「多 workflow 回推排队」）
 
 ## 行为差异（写法相同、表现不同）
@@ -76,9 +76,9 @@
 - **无效 workflow 会显式失败**：推送解析失败的 workflow 文件会生成一条带错误的失败 run（不再静默）
 - **Runner 需要 Git ≥ 2.34.1**（下载 action / reusable workflow 改走 Git CLI）；job 镜像也要有 Git，且能访问并信任 Gitea 证书（`actions/checkout` 需要）
 
-## 内置 token 与 CI 回推（实测注意）
+## 内置 token 与 CI 回推（注意）
 
-- **两个平台的内置 token 都不会自动注入为同名环境变量**：GitHub 的 `GITHUB_TOKEN` 由 GitHub 自动创建，经 `${{ secrets.GITHUB_TOKEN }}` 或 `${{ github.token }}` 引用；Gitea 的 `GITEA_TOKEN` 只通过 `${{ secrets.GITEA_TOKEN }}` 暴露。步骤里直接引用裸 `${GITHUB_TOKEN}` / `${GITEA_TOKEN}` 都可能得到空值（Gitea 实测 push 报 `Failed to authenticate user`）——**两者都必须显式 `env:` 映射**。Gitea 侧还**禁止硬编码** `<实例>/<owner>/<repo>`（如 `http://server:3500` / `gitea.yindexiaowu.top:16666/Yin/repo`），一律用 `github.server_url` + `github.repository` 动态拼接（`server_url` 含 `https://`，`git push` 需去协议头）：
+- **两个平台的内置 token 都不会自动注入为同名环境变量**：GitHub 的 `GITHUB_TOKEN` 由 GitHub 自动创建，经 `${{ secrets.GITHUB_TOKEN }}` 或 `${{ github.token }}` 引用；Gitea 的 `GITEA_TOKEN` 只通过 `${{ secrets.GITEA_TOKEN }}` 暴露。步骤里直接引用裸 `${GITHUB_TOKEN}` / `${GITEA_TOKEN}` 都可能得到空值（Gitea 侧 push 会报 `Failed to authenticate user`）——**两者都必须显式 `env:` 映射**。Gitea 侧还**禁止硬编码** `<实例>/<owner>/<repo>`（如 `http://server:3500` / `gitea.yindexiaowu.top:16666/Yin/repo`），一律用 `github.server_url` + `github.repository` 动态拼接（`server_url` 含 `https://`，`git push` 需去协议头）：
   ```yaml
   - run: |
       HOST="${GITEA_SERVER_URL#https://}"
@@ -124,7 +124,6 @@
 > **CHANGELOG 驱动（强制）**：禁止用 `git log PREV_TAG..HEAD` 直拼 Release body 冒充 CHANGELOG（见 `changelog-conventions.md`「糟糕实践」）；`CHANGELOG 是发版的输入`（`ci-cd-practices.md` 标准 CD 全流程 ③），CD 必须从 `CHANGELOG.md` 该版本小节提取。示例仓库需先有 `CHANGELOG.md`（含 `## [Unreleased]`，发版前整理为 `## [x.y.z] - YYYY-MM-DD`；预发布为 `## [x.y.z-rc.N] - YYYY-MM-DD`）——版本一致性 `tag == CHANGELOG == 包清单版本` 进流水线，不一致即失败（见 `changelog-conventions.md` 一致性卡点；**单一版本源仓**前提，monorepo/多制品按各自版本源）。
 
 - **触发**：`on.push.tags: ['v*']`（打 tag 发版），发版 job 用 `if: startsWith(github.ref, 'refs/tags/v')` 兜底。`workflow_dispatch` 的 ref 是分支，**不能**把分支名当 tag 发布；要手动补发时用原 tag run 的 re-run，或单独定义 `tag` 输入并让校验与发布统一使用该输入。
-- **实测（2026-11-20，Gitea 28.4.0 + Runner 6.0.0）**：tag push 触发本模板（`actions/checkout@v7`）成功创建 Release（body 为 `CHANGELOG.md` 对应小节，`prerelease=false`）；在 `main` 上 `workflow_dispatch` 时整个 release job 为 `skipped`，后续发布步骤没有执行。预发布 tag `v1.2.4-rc.1` 也实测成功：`prerelease=true`，且 `GET .../releases/latest` 仍返回稳定版 `v1.2.3`。
 - **`permissions.contents: write`** 足够（兼容 Gitea `releases: write`）
 - **动态拼接（零硬编码，推荐）**：`github.server_url` + `github.repository` + `github.ref_name`（`github.*` 完全等同 `gitea.*`，且可过 actionlint；`gitea.*` 会报 `undefined variable "gitea"`）
   ```yaml
@@ -202,7 +201,7 @@
   - `draft` 管**可见性**（未发布，外部不可见），`prerelease` 管**成熟度**（已发布但非生产可用）；两者独立，不要用 draft 代替 prerelease
   - `GET .../releases/latest` 只返回**非 draft、非 prerelease** 的最新一条；标记正确后，rc 不会顶掉首页的稳定版
   - 已存在 Release 返回 409 时，改标记要 `PATCH /repos/{owner}/{repo}/releases/{id}`（body `{ "prerelease": true }`）；重新 POST 不会改旧值
-  - 实测（Gitea 28.x 系列）：**仓库尚无稳定版时**，创建 rc 后 `/releases/latest` 返回 404；**已有稳定版时**，再发 rc 仍返回该稳定版（实测 `v0.12.0`）；`?pre-release=true` 可筛出 rc；`PATCH {prerelease:false}` 可转正
+  - Gitea 行为：**仓库尚无稳定版时**，创建 rc 后 `/releases/latest` 返回 404；**已有稳定版时**，再发 rc 仍返回该稳定版；`?pre-release=true` 可筛出 rc；`PATCH {prerelease:false}` 可转正
 - **API 形态**：`POST {server_url}/api/v1/repos/{owner}/{repo}/releases`，鉴权 `Authorization: token $GITEA_TOKEN`（`GITEA_TOKEN` 须 `env: GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}` 显式注入，不裸注入），payload `{tag_name,name,body,draft,prerelease}`（`prerelease` 按 tag 推导，见上；勿写死），成功 `201`/`200`；已存在 `409` 时按 tag 查 id 并 `PATCH` 校正 `prerelease`，**不要静默跳过**
 - **验证预发布**：创建后 `GET .../releases?pre-release=true` 应包含 rc/beta；`GET .../releases/latest` 在只有预发布时返回 404、有稳定版时仍返回稳定版
 - **校验**：`github.server_url/repository/ref_name` 均在 `references/contexts.md` 常用属性表已列；用 `github.*` 可直接过 `actionlint`，无需 `-ignore`
@@ -211,9 +210,8 @@
 
 - 官方 job 镜像：`docker.gitea.com/runner-images:ubuntu-latest`（Runner 6.0.0 新注册 runner 默认还带 `ubuntu-26.04` 标签）
 - **Runner 6.0.0 已移除 `builtin:checkout`**（破坏性变更）：`uses: builtin:checkout` 的步骤会直接失败。新 workflow 用 `actions/checkout`；job 镜像没有 Node 时用 `taiki-e/checkout-action`（只依赖 Git + shell）。Runner 6.0.0 要求 Gitea ≥ 1.26.2，28.4.0 满足
-  > docs.gitea.com 的 comparison 页仍把 `builtin:` 列为特性，但 Runner 6.0.0 发布说明（2026-11-11）明确移除 `builtin:checkout`；这里以 Runner 发布说明为准。
-  > **实测（2026-11-20，Runner 6.0.0）**：`uses: builtin:checkout` 报 `invalid action "builtin:checkout"` 并失败；同一临时仓库的 `actions/checkout@v7` 成功。
-- `actions/checkout@v7` 实测可用（Runner 6.0.0；从 github.com 或本实例下载）；Git ≥ 2.34.1，job 镜像需有 Node 运行时
+  > docs.gitea.com 的 comparison 页仍把 `builtin:` 列为特性，但 Runner 6.0.0 发布说明明确移除 `builtin:checkout`；这里以 Runner 发布说明为准。
+- `actions/checkout@v7` 可用（Runner 6.0.0；从 github.com 或本实例下载）；Git ≥ 2.34.1，job 镜像需有 Node 运行时
 
 ## 版本边界（基线：Gitea 28.4.0 + Runner 6.0.0）
 
@@ -249,7 +247,7 @@ actionlint -ignore='the runner of "actions/upload-artifact@v3(\.[0-9]+\.[0-9]+)?
 actionlint -ignore 'unexpected key "queue"' .gitea/workflows/ci.yaml
 ```
 
-> **Windows/pwsh 注意（实测）**：通配符 `*.yml` 不会被 pwsh 展开（见 SKILL.md「校验方法」），**逐个列出文件**或先用 `Get-ChildItem ... *.yml` 展开再传。Linux/macOS bash 下 shell 会自动展开 glob。
+> **Windows/pwsh 注意**：通配符 `*.yml` 不会被 pwsh 展开（见 SKILL.md「校验方法」），**逐个列出文件**或先用 `Get-ChildItem ... *.yml` 展开再传。Linux/macOS bash 下 shell 会自动展开 glob。
 
 - actionlint 版本升级可能引入新规则导致误报，CI 中建议固定版本
 - 绝对 URL 的 `uses: https://...` 不会被纯语法检查报错（仅 `actions` 附加规则在执行时检查）
