@@ -36,13 +36,13 @@ GitHub Actions 与 Gitea Actions 共享大部分 surface syntax，但事件、�
 
 ## 校验
 
-`scripts/actionlint.exe`（Windows amd64, v1.7.12）支持单/多文件与 stdin：`scripts/actionlint.exe .github/workflows/ci.yml`；Gitea 须显式路径。pwsh 下 `*.yml` 不自动展开，逐个列出。误报 `gitea` 用 `-ignore 'undefined variable "gitea"'`；v1.7.12 尚不认识 `concurrency.queue`，会报 `unexpected key "queue"`——这是校验器滞后，不是 workflow 错误，可用 `-ignore 'unexpected key "queue"'` 放行，别为过 lint 删掉 `queue: max`。版本源 `scripts/actionlint.version`，先跑 `scripts/update-actionlint.ps1` 单次保鲜。**actionlint 通过只证明 GitHub 语法可解析，不代表 Gitea 能解析或运行该写法**（尤其 `concurrency.queue`、`environment`、`builtin:`）。
+`scripts/actionlint.exe`（Windows amd64, v1.7.12）支持单/多文件与 stdin：`scripts/actionlint.exe .github/workflows/ci.yml`；Gitea 须显式路径。pwsh 下 `*.yml` 不自动展开，逐个列出。误报 `gitea` 用 `-ignore 'undefined variable "gitea"'`；v1.7.12 尚不认识 `concurrency.queue`，会报 `unexpected key "queue"`——这是校验器滞后，不是 workflow 错误，可用 `-ignore 'unexpected key "queue"'` 放行，别为过 lint 删掉 `queue: max`。版本源 `scripts/actionlint.version`，先跑 `scripts/update-actionlint.ps1` 单次保鲜。**actionlint 通过只证明 GitHub 语法可解析，不代表 Gitea 能解析或运行该写法**（尤其 `concurrency.queue`、`environment`）。
 
 ## Common Mistakes
 
 - 凭记忆写 `on` / `permissions` → 必读对应 reference
 - Gitea 套用 `jobs.*.environment`、`concurrency.queue`、`workflow_dispatch` 的 `type: environment`、`{group:,labels:}`、专属 scope / `GITHUB_TOKEN`
-- 给 job 漏写 `runs-on`（Runner 5.0.0 起缺失即失败，6.0.0 继续要求；不再回退默认镜像）；job 级 `if:` 误用 `matrix.*`（在 matrix 展开前求值，须挪到 step 级或 `include/exclude`）
+- 给 job 漏写 `runs-on`（Runner 6.0.0 下缺失即失败，不再回退默认镜像）；job 级 `if:` 误用 `matrix.*`（在 matrix 展开前求值，须挪到 step 级或 `include/exclude`）
 - `secrets` 误用于 `if`、`pull_request_target` 滥用、tag 回推忘 `HEAD:main`
 - 硬编码 `http://server:3500` / 固定 `owner/repo` → 用 `${{ github.server_url }}/${{ github.repository }}/${{ github.ref_name }}` 动态拼接（`gitea-differences.md` Release/回推通用模板，push 需去协议头）
 - 发版流水线未校验 `tag == CHANGELOG == package.json`（**单一版本源仓**；monorepo/多制品按各自版本源）或 Release body 非来自 `CHANGELOG.md`（见 `changelog-conventions.md` 一致性卡点）→ CD 发版必须从 `CHANGELOG.md` 该版本小节提取 body，`git log` 堆砌属违规
