@@ -56,6 +56,7 @@
 
 - Gitea 28.4 支持 workflow 级与 job 级 `concurrency` 的 `group` / `cancel-in-progress`（含表达式），同名 group 跨 workflow 互斥
 - **不支持 `queue`**（`single` / `max` 均无；`queue: max` 仍是 open proposal，go-gitea/gitea#39195）。行为等同 GitHub 默认 `queue: single`：running 不被取消，只保留一个 pending，新 pending 替换旧 pending
+- **实测（2026-11-20，Gitea 28.x + Runner 6.0.0，临时仓库）**：`queue: max` 被接受但不生效；连续触发 3 次，只保留 1 个 running + 1 个 pending，中间 pending 被取消，最后一个 pending 在 running 结束后才执行——确认不能照搬 GitHub `queue: max`
 - Gitea 目标不要写 `queue: max` 期待多 pending；需要多个回推串行时合并 workflow 或自行重试（见 `ci-cd-practices.md`「多 workflow 回推排队」）
 
 ## 行为差异（写法相同、表现不同）
@@ -123,6 +124,7 @@
 > **CHANGELOG 驱动（强制）**：禁止用 `git log PREV_TAG..HEAD` 直拼 Release body 冒充 CHANGELOG（见 `changelog-conventions.md`「糟糕实践」）；`CHANGELOG 是发版的输入`（`ci-cd-practices.md` 标准 CD 全流程 ③），CD 必须从 `CHANGELOG.md` 该版本小节提取。示例仓库需先有 `CHANGELOG.md`（含 `## [Unreleased]`，发版前整理为 `## [x.y.z] - YYYY-MM-DD`；预发布为 `## [x.y.z-rc.N] - YYYY-MM-DD`）——版本一致性 `tag == CHANGELOG == 包清单版本` 进流水线，不一致即失败（见 `changelog-conventions.md` 一致性卡点；**单一版本源仓**前提，monorepo/多制品按各自版本源）。
 
 - **触发**：`on.push.tags: ['v*']`（打 tag 发版），发版 job 用 `if: startsWith(github.ref, 'refs/tags/v')` 兜底。`workflow_dispatch` 的 ref 是分支，**不能**把分支名当 tag 发布；要手动补发时用原 tag run 的 re-run，或单独定义 `tag` 输入并让校验与发布统一使用该输入。
+- **实测（2026-11-20，Gitea 28.x + Runner 6.0.0）**：tag push 触发本模板成功创建 Release（body 为 `CHANGELOG.md` 对应小节，`prerelease=false`）；在 `main` 上 `workflow_dispatch` 时整个 release job 为 `skipped`，后续发布步骤没有执行。
 - **`permissions.contents: write`** 足够（兼容 Gitea `releases: write`）
 - **动态拼接（零硬编码，推荐）**：`github.server_url` + `github.repository` + `github.ref_name`（`github.*` 完全等同 `gitea.*`，且可过 actionlint；`gitea.*` 会报 `undefined variable "gitea"`）
   ```yaml
@@ -210,6 +212,7 @@
 - 官方 job 镜像：`docker.gitea.com/runner-images:ubuntu-latest`（Runner 6.0.0 新注册 runner 默认还带 `ubuntu-26.04` 标签）
 - **Runner 6.0.0 已移除 `builtin:checkout`**（破坏性变更）：`uses: builtin:checkout` 的步骤会直接失败。新 workflow 用 `actions/checkout`；job 镜像没有 Node 时用 `taiki-e/checkout-action`（只依赖 Git + shell）。Runner 6.0.0 要求 Gitea ≥ 1.26.2，28.4.0 满足
   > docs.gitea.com 的 comparison 页仍把 `builtin:` 列为特性，但 Runner 6.0.0 发布说明（2026-11-11）明确移除 `builtin:checkout`；这里以 Runner 发布说明为准。
+  > **实测（2026-11-20，Runner 6.0.0）**：`uses: builtin:checkout` 报 `invalid action "builtin:checkout"` 并失败；同一临时仓库的 `actions/checkout@v4` 成功。
 - `actions/checkout@v4` 仍可用（从 github.com 或本实例下载；需目标镜像提供 Node 运行时）；Git ≥ 2.34.1。Gitea 示例保留 `@v4` 是保守选择；Runner 6.0.0 发布说明推荐 `actions/checkout@v6`，升级前先核对目标 Runner 镜像的 Node 运行时，不要直接照搬 GitHub 的 `@v7`
 - **Runner 5.x 兼容**：5.x 仍支持 `builtin:checkout`（4.0.0 引入，5.0.0 起行为对齐 `actions/checkout`），支持 `fetch-depth`（默认 `1`）、`clean`（默认 `true`，删除未跟踪/忽略文件）、`submodules`、`lfs`、`persist-credentials`（默认 `true`）等常用输入；**传入未知输入会直接失败该步骤**。只在维护旧 Runner 时使用，新 workflow 不要写
 

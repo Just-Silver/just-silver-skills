@@ -58,7 +58,7 @@
   - `environment` 类型用于选择仓库已配置的 Environment，`inputs.<name>` 得到环境名字符串；**是否施加保护规则仍取决于 job 级 `environment:`**（输入本身不等于环境门禁）
   - `options` 仅对 `choice` 合法；给其他类型写 `options` 会使 workflow 无效
   - 输入在 `${{ inputs.<name> }}` 中读取；`github.event.inputs` 中同值但全部转成字符串（`boolean` 也不会保留布尔类型）
-  - **Gitea 28.4 无 Environments 概念**：`type: environment` 不会被识别为环境选择（28.4 Web 表单只特判 `choice` / `boolean` / `number`，其余按文本框），也没有环境保护规则；Gitea 目标用 `string` / `choice`，门禁用 `if` + 分支保护
+  - **Gitea 28.4 无 Environments 概念**：`type: environment` 不会被识别为环境选择（28.4 Web 表单只特判 `choice` / `boolean` / `number`，其余按文本框），也没有环境保护规则；实测 28.x 可解析并通过 API 传值，但没有环境语义。Gitea 目标用 `string` / `choice`，门禁用 `if` + 分支保护
 - `workflow_call`：可复用工作流，定义 `inputs`（必带 `type`）、`outputs`、`secrets`
 - `workflow_run`：在其他 workflow 完成/请求后触发，如 `on.workflow_run.workflows: ["Build"]`
 
