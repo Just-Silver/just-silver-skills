@@ -31,7 +31,7 @@
       - cron: '30 5 * * 1-5'
         timezone: "America/New_York"
   ```
-- `workflow_dispatch`：手动触发，可定义 `inputs`（`type`: `boolean`/`choice`/`number`/`string`），仅默认分支上的文件触发
+- `workflow_dispatch`：手动触发，可定义 `inputs`（`type`: `boolean`/`choice`/`number`/`environment`/`string`），仅默认分支上的文件触发；顶层 input 最多 25 个，payload ≤ 65,535 字符
 - `workflow_dispatch` 完整 inputs 语法（含 `choice` 选项）：
   ```yaml
   on:
@@ -49,9 +49,16 @@
           description: '是否开启调试'
           required: false
           type: boolean
+        deploy_env:
+          description: '选择仓库 Environment（仅 GitHub）'
+          required: false
+          type: environment
   ```
-  - `type` 合法值仅 `boolean` / `choice` / `number` / `string`（**没有** `environment`；`environment` 是 job 级部署环境键，不是输入类型）
-  - 输入在 `${{ inputs.<name> }}` 中读取
+  - `type` 合法值：`boolean` / `choice` / `number` / `environment` / `string`
+  - `environment` 类型用于选择仓库已配置的 Environment，`inputs.<name>` 得到环境名字符串；**是否施加保护规则仍取决于 job 级 `environment:`**（输入本身不等于环境门禁）
+  - `options` 仅对 `choice` 合法；给其他类型写 `options` 会使 workflow 无效
+  - 输入在 `${{ inputs.<name> }}` 中读取；`github.event.inputs` 中同值但全部转成字符串（`boolean` 也不会保留布尔类型）
+  - **Gitea 28.4 无 Environments 概念**：`type: environment` 不会被识别为环境选择（28.4 Web 表单只特判 `choice` / `boolean` / `number`，其余按文本框），也没有环境保护规则；Gitea 目标用 `string` / `choice`，门禁用 `if` + 分支保护
 - `workflow_call`：可复用工作流，定义 `inputs`（必带 `type`）、`outputs`、`secrets`
 - `workflow_run`：在其他 workflow 完成/请求后触发，如 `on.workflow_run.workflows: ["Build"]`
 
@@ -66,21 +73,33 @@
     contents: write
   ```
 
-## `concurrency`（并发互斥 / 排队）
+## `concurrency`（并发互斥 / 待排队上限）
 
-- 两级作用域：顶层（整个 workflow 一次只跑一个）与 `jobs.<id>.concurrency`（单个 job 互斥）。**同名 `group` 跨 workflow 也互斥**——多 workflow 回推排队的关键就靠这一点。
-- 两种写法：字符串简写（默认排队不取消）与完整写法：
+- 两级作用域：顶层（整个 workflow run）与 `jobs.<id>.concurrency`（单个 job）。**同名 `group` 跨 workflow 也互斥**——多 workflow 回推排队的关键就靠这一点。
+- 同一 group 同时最多 **1 个 running**；新运行时若已有 running，新运行进入 `pending`。
+- **默认 `queue: single`**：`pending` 也只保留 1 个；再来的运行会取消旧 `pending` 并顶替它。所以 `cancel-in-progress: false` **不是可靠队列**——它只保证 running 不被取消，不保证多个待跑都保留。
+- `cancel-in-progress: true`：新运行取消同组 running（以及 pending），常用于 CI 省 runner 分钟。
+- `queue: max`：把 `pending` 上限提高到 **100**；队列满后新运行被取消；按开始等待的时间 FIFO，但**顺序不保证**。**不能与 `cancel-in-progress: true` 同用**（workflow 校验错误）。
+- 写法：字符串简写等价于只设 group（`cancel-in-progress` 默认 false、`queue` 默认 single）：
   ```yaml
   concurrency: ci-${{ github.ref }}
   # 等价于
   concurrency:
     group: ci-${{ github.ref }}
     cancel-in-progress: false
+    queue: single
   ```
-- `cancel-in-progress: true` → 新运行取消组内旧的排队/进行中（CI 省 runner 分钟，见 ci-cd-practices.md 骨架）。
-- `cancel-in-progress: false`（默认值，可省略）→ 组内排队等待，一次只跑一个（**带 `git push` 回推的 workflow 必须用此模式**，见 ci-cd-practices.md「多 workflow 回推排队」）。
-- `group` 命名：常用 `${{ github.ref }}` 按分支隔离；**需互斥的多个 workflow 必须用完全相同的 `group` 名**（如 `pushback-${{ github.ref }}`），否则各排各的队，照样冲突。
-- 可用上下文受限：仅 `github` / `inputs` / `vars`（见 contexts.md）——`secrets` / `matrix` / `needs` 在此不可用。
+- 需要容纳多个待跑运行时显式写 `queue: max`：
+  ```yaml
+  concurrency:
+    group: pushback-${{ github.ref }}
+    queue: max
+    cancel-in-progress: false      # 与 queue: max 搭配时必须为 false/省略
+  ```
+  > actionlint 1.7.12 尚未认识 `queue`，会报 `unexpected key "queue"`；用 `-ignore 'unexpected key "queue"'` 放行（SKILL.md「校验」）。
+- `group` 命名：常用 `${{ github.ref }}` 按分支隔离；**需互斥的多个 workflow 必须用完全相同的 `group` 名**（如 `pushback-${{ github.ref }}`），否则各排各的队，照样冲突。group 名**大小写不敏感**（`prod` 与 `Prod` 同组）。
+- 可用上下文：顶层 `concurrency` 仅 `github` / `inputs` / `vars`；`jobs.<id>.concurrency` 还可用 `needs` / `strategy` / `matrix`（见 contexts.md）。
+- **Gitea 28.4**：支持 `group` 与 `cancel-in-progress`（含表达式），但**不支持 `queue`**（`queue: max` 仍是 open proposal，见 go-gitea/gitea#39195）；其行为固定为只保留一个 pending（新 pending 替换旧 pending），等同 GitHub 的 `queue: single`。Gitea 目标不要照搬 `queue: max`，也不能把 `cancel-in-progress: false` 当作多任务队列。
 
 ## `jobs`
 
@@ -127,7 +146,7 @@
 | `actions/cache` | 依赖缓存 | `@v6` | `path`、`key`（常配 `hashFiles()`） |
 | `softprops/action-gh-release` | 创建 GitHub Release | `@v3` | `tag_name`、`name`、`body_path` |
 
-> **版本核对（2026-09 经 GitHub API 实测）**：以上"常用版本"即各 action 的**当前最新 major**。写新 workflow 前建议用 `gh api repos/<owner>/<repo>/releases/latest --jq .tag_name` 复核（major 可能已升级），并看 release notes 确认参数无破坏性变更。个别 action 最新 major 与文档不符时以实测为准并更新本表。
+> **版本核对（2026-11-20 经 `gh api repos/<owner>/<repo>/releases/latest` 实测）**：以上"常用版本"即各 action 的**当前最新 major**。写新 workflow 前建议再复核（major 可能已升级），并看 release notes 确认参数无破坏性变更。个别 action 最新 major 与文档不符时以实测为准并更新本表。**不要因为看到新 major 就批量升级**：Gitea 侧还要核对目标 Runner 的 Node 运行时与镜像兼容性。
 
 ### 写 job output 的标准方式
 

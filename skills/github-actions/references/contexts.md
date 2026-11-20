@@ -63,7 +63,9 @@
 
 | 位置 | 可用上下文 |
 |------|-----------|
-| `run-name` / `concurrency` | `github`, `inputs`, `vars` |
+| `run-name` | `github`, `inputs` |
+| `concurrency`（workflow 级） | `github`, `inputs`, `vars` |
+| `jobs.<id>.concurrency` | `github`, `inputs`, `vars`, `needs`, `strategy`, `matrix` |
 | 顶层 `env` | `github`, `secrets`, `inputs`, `vars` |
 | `jobs.<id>.if` | `github`, `needs`, `vars`, `inputs` |
 | `jobs.<id>.steps.if` | `github`, `needs`, `strategy`, `matrix`, `job`, `runner`, `env`, `vars`, `steps`, `inputs`（**无 `secrets`**） |

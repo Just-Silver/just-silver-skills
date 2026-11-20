@@ -84,22 +84,25 @@ jobs:
 
 ### 多 workflow 回推排队（防 `git push` 冲突）
 
-多个 workflow 同时带 `git push` 回仓库时（如 update-readme 自动提交 + actionlint 二进制更新 + 镜像同步），会因基于旧 base 提交而 push 冲突失败。此时**不得**用 `cancel-in-progress: true`（会取消掉还没 push 的运行，丢提交），必须让同组排队串行：
+多个 workflow 同时带 `git push` 回仓库时（如 update-readme 自动提交 + actionlint 二进制更新 + 镜像同步），会因基于旧 base 提交而 push 冲突失败。此时**不得**用 `cancel-in-progress: true`（会取消掉还没 push 的运行，丢提交），必须让同组串行；但**不能把 `concurrency` 当可靠队列**：
 
 ```yaml
-# 每个带回推的 workflow 顶层都写完全相同的 group
+# GitHub：每个带回推的 workflow 顶层都写完全相同的 group
 concurrency:
-  group: pushback-${{ github.ref }}
-  cancel-in-progress: false   # 默认值，可省略；组内排队，一次只跑一个
+  group: auto-commit-main
+  queue: max                  # 允许最多 100 个 pending；默认 single 只留 1 个
+  cancel-in-progress: false   # 与 queue: max 搭配时必须为 false/省略
 ```
 
-- **同名是关键**：组名按 `group` 字符串跨 workflow 互斥。各 workflow 若 group 名不同（如各用各的 `ci-...`），等于没排队，照样冲突。组名可用固定名（如只回推 main 的 `auto-commit-main`）或按分支隔离（如 `pushback-${{ github.ref }}`），选一种后所有回推 workflow 保持一致。
-- 回推步骤本身仍要 `git pull --rebase` 后再 `git push`（排队只保证不同时跑，不保证 base 最新）。
-- CI 纯检查类 workflow 继续用 `cancel-in-progress: true` 省 runner；只有**带写回**（push / Release / 镜像同步提交）的 workflow 进 `pushback-` 组。
+- **默认不是队列**：GitHub 的 `queue` 默认 `single`，只保留一个 pending；再来的运行会取消旧 pending 并顶替它。`cancel-in-progress: false` 只保证 running 不被取消，**不保证多个待跑都保留**。要容纳多个回推必须显式 `queue: max`。
+- **`queue: max` 也不是持久队列**：最多 100 个 pending，队列满后新运行会被取消；FIFO 顺序不保证。回推步骤本身仍要 `git pull --rebase` 后再 `git push`，并处理失败（重试/告警）。
+- **同名是关键**：组名按 `group` 字符串跨 workflow 互斥（大小写不敏感）。各 workflow 若 group 名不同（如各用各的 `ci-...`），等于没排队，照样冲突。组名可用固定名（如只回推 main 的 `auto-commit-main`）或按分支隔离（如 `pushback-${{ github.ref }}`），选一种后所有回推 workflow 保持一致。
+- **Gitea 28.4 不支持 `queue`**：`cancel-in-progress: false` 同样只保留一个 pending（新 pending 替换旧 pending），不能靠多个待跑任务排队。多个回推来源应合并进一个 workflow，或把 push 失败做成可重试/告警，不能假设排队不丢。
+- CI 纯检查类 workflow 继续用 `cancel-in-progress: true` 省 runner；只有**带写回**（push / Release / 镜像同步提交）的 workflow 进同一个回推组（固定名或 `pushback-...`）。
 
 ### Gitea 等价
 
-同一骨架可直接放到 `.gitea/workflows/`（事件、concurrency、permissions、setup-node 均支持）。注意：Gitea 默认没有 GitHub-hosted runner，`runs-on` 标签映射到 job 容器镜像；`cache: 'npm'` 依赖 Gitea 实例的 actions 缓存配置。语法差异一律以 gitea-differences.md 为准。
+同一骨架可直接放到 `.gitea/workflows/`（事件、permissions、setup-node 均支持；`concurrency` 支持 `group`/`cancel-in-progress`，**不支持 `queue`**）。注意：Gitea 默认没有 GitHub-hosted runner，`runs-on` 标签映射到 job 容器镜像；`cache: 'npm'` 依赖 Gitea 实例的 actions 缓存配置。语法差异一律以 gitea-differences.md 为准。
 
 ## 二、CI 失败反馈循环（与 Agent 协同）
 
@@ -310,13 +313,13 @@ on:
 
 > 对应 `changelog-conventions.md` 一致性卡点；禁止 `git log` 拼 body。
 
-见 `gitea-differences.md` 更新后的 `Gitea Release 发布` 骨架（`Check version consistency` + `Extract Release Notes from CHANGELOG`），直接照抄两步即可；`workflow_dispatch` 触发时跳过校验。
+见 `gitea-differences.md` 的 `Gitea Release 发布` 骨架（`Check version consistency` + `Extract Release Notes from CHANGELOG`），直接照抄即可；发版 job 以 `if: startsWith(github.ref, 'refs/tags/v')` 限定为 tag 触发。不要把 `workflow_dispatch`（ref 是分支）当作 tag 发版入口；需要手动补发时用原 tag run 的 re-run，或单独定义 `tag` 输入并让校验与发布都用这个输入。
 
 ## 五、双平台速览（本文件方法论在 Gitea 的对应）
 
 | 工程实践 | GitHub | Gitea |
 |---------|--------|-------|
-| 质量门禁骨架 | `.github/workflows/ci.yml` | `.gitea/workflows/ci.yml`（事件/语法通用） |
+| 质量门禁骨架 | `.github/workflows/ci.yml` | `.gitea/workflows/ci.yml`（事件语法大体兼容，差异见 gitea-differences.md） |
 | 缓存 | setup-* cache / actions/cache | 依赖实例 actions 缓存配置 |
 | Environments 保护 | `environment:` + 保护规则 | **不支持**，用 if + 分支保护 |
 | 环境级 secrets | Environments secrets | 仓库/组织 secrets（无环境级） |
@@ -331,6 +334,7 @@ on:
 - **flaky 测试靠 rerun 掩盖** → 掩盖的是真 bug 或真实环境问题，最后爆在发布后
 - **CI 从不失败 / 失败被忽略** → 门禁形同虚设；CI 绿了才是合并前提
 - **生产 secrets 进 CI / 写进仓库** → CI 与生产 secret 必须分层
+- **把 `concurrency` 当可靠队列** → 默认 `queue: single` 会替换 pending；回推/发布需要容纳多个待跑时 GitHub 用 `queue: max`（仍非持久队列，超 100 会取消），Gitea 28.4 无 `queue`（见「多 workflow 回推排队」）
 - **没有手动发布通道**（只能靠 push 触发部署）→ 生产部署无法控制时机；加 workflow_dispatch
 - **生产部署无保护** → GitHub 用 environment 保护规则；Gitea 用分支保护 + 手动触发
 - **发版不看 CHANGELOG / 版本一致性** → tag、CHANGELOG、包版本三处不一致（单一版本源仓），产物与记录脱节；发版前整理 Unreleased 并核对一致性（见 changelog-conventions.md）

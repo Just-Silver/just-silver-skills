@@ -7,7 +7,7 @@ description: Use when creating or editing GitHub Actions or Gitea Actions workfl
 
 ## Overview
 
-GitHub Actions 与 Gitea Actions 约 95% 语法通用（后者兼容前者）。禁止凭记忆臆造语法——所有键、事件、表达式、上下文以官方文档为准，`references/` 已提炼要点，按需加载。
+GitHub Actions 与 Gitea Actions 共享大部分 surface syntax，但事件、权限、token、执行器、并发语义均有实质差异，不能按固定兼容比例直接迁移。禁止凭记忆臆造语法——所有键、事件、表达式、上下文以官方文档为准，`references/` 已提炼要点，按需加载；版本或能力存疑时必须查对应版本文档。
 
 ## When to Use
 
@@ -26,29 +26,29 @@ GitHub Actions 与 Gitea Actions 约 95% 语法通用（后者兼容前者）。
 | 触发事件与 `pull_request_target` 安全 | `references/events.md` |
 | `${{ }}`、运算符、函数、状态检查 | `references/expressions.md` |
 | `github` / `secrets` / `needs` 等上下文 | `references/contexts.md` |
-| **Gitea 目标必读**：目录、token、权限、28.x/Runner 5.x 差异 | `references/gitea-differences.md` |
+| **Gitea 目标必读**：目录、token、权限、28.4.0 / Runner 6.0.0 差异 | `references/gitea-differences.md` |
 | 质量门禁、CI 优化、部署策略 | `references/ci-cd-practices.md` |
 | CD/发版/Release（含 `push.tags` / `releases` API / `cd.yml`、预发布 `-rc`/`-beta`/`-alpha`） | `references/ci-cd-practices.md` + `references/changelog-conventions.md` 必读（CHANGELOG 是输入，Release 引用它；**单一版本源仓** `tag==CHANGELOG==包版本` 一致性进流水线；`prerelease` 由 tag 推导、不得写死；monorepo/多制品仓先识别各自版本源，不强行统一） |
 
 > 凡文件含 `push.tags`、`releases` API、`CHANGELOG` 或任务含“发版/CD/Release/预发布(rc/beta/alpha)”，必须走此分支；绕过即违规，`gitea-differences.md` 的 `git log` 演示不得覆盖本分支。
 
-> 先确认平台：GitHub → 1-4；Gitea → 1-4 + `gitea-differences.md` 必读（**本技能只覆盖 Gitea 28.x + Runner 5.x**，默认按此编写；实例明显过旧或语法存疑时以对应版本官方文档为准，本文件只是速查）。
+> 先确认平台：GitHub → 1-4；Gitea → 1-4 + `gitea-differences.md` 必读（**本技能以 Gitea Server 28.4.0 + Gitea Runner 6.0.0 为编写基线**；目标是其他版本时必须查该版本官方文档核验能力边界，不要套用本文；官方文档与本文件冲突时以官方为准，允许并鼓励查证）。
 
 ## 校验
 
-`scripts/actionlint.exe`（Windows amd64, v1.7.12）支持单/多文件与 stdin：`scripts/actionlint.exe .github/workflows/ci.yml`；Gitea 须显式路径。pwsh 下 `*.yml` 不自动展开，逐个列出。误报 `gitea` 用 `-ignore 'undefined variable "gitea"'`。版本源 `scripts/actionlint.version`，先跑 `scripts/update-actionlint.ps1` 单次保鲜。
+`scripts/actionlint.exe`（Windows amd64, v1.7.12）支持单/多文件与 stdin：`scripts/actionlint.exe .github/workflows/ci.yml`；Gitea 须显式路径。pwsh 下 `*.yml` 不自动展开，逐个列出。误报 `gitea` 用 `-ignore 'undefined variable "gitea"'`；v1.7.12 尚不认识 `concurrency.queue`，会报 `unexpected key "queue"`——这是校验器滞后，不是 workflow 错误，可用 `-ignore 'unexpected key "queue"'` 放行，别为过 lint 删掉 `queue: max`。版本源 `scripts/actionlint.version`，先跑 `scripts/update-actionlint.ps1` 单次保鲜。**actionlint 通过只证明 GitHub 语法可解析，不代表 Gitea 能解析或运行该写法**（尤其 `concurrency.queue`、`environment`、`builtin:`）。
 
 ## Common Mistakes
 
 - 凭记忆写 `on` / `permissions` → 必读对应 reference
-- Gitea 套用 `environment` / `{group:,labels:}` / 专属 scope / `GITHUB_TOKEN`
-- 给 job 漏写 `runs-on`（Gitea 28.x + Runner 5.x 起缺失即失败，不再回退默认镜像）；job 级 `if:` 误用 `matrix.*`（在 matrix 展开前求值，须挪到 step 级或 `include/exclude`）
+- Gitea 套用 `jobs.*.environment`、`concurrency.queue`、`workflow_dispatch` 的 `type: environment`、`{group:,labels:}`、专属 scope / `GITHUB_TOKEN`
+- 给 job 漏写 `runs-on`（Runner 5.0.0 起缺失即失败，6.0.0 继续要求；不再回退默认镜像）；job 级 `if:` 误用 `matrix.*`（在 matrix 展开前求值，须挪到 step 级或 `include/exclude`）
 - `secrets` 误用于 `if`、`pull_request_target` 滥用、tag 回推忘 `HEAD:main`
 - 硬编码 `http://server:3500` / 固定 `owner/repo` → 用 `${{ github.server_url }}/${{ github.repository }}/${{ github.ref_name }}` 动态拼接（`gitea-differences.md` Release/回推通用模板，push 需去协议头）
 - 发版流水线未校验 `tag == CHANGELOG == package.json`（**单一版本源仓**；monorepo/多制品按各自版本源）或 Release body 非来自 `CHANGELOG.md`（见 `changelog-conventions.md` 一致性卡点）→ CD 发版必须从 `CHANGELOG.md` 该版本小节提取 body，`git log` 堆砌属违规
 - 发版 payload 把 `prerelease` 写死为 `false` → 预发布 tag（`v1.2.3-rc.1` / `-beta.2` / `-alpha`）必须 `true`；`x.y.z` 与 `0.x` 不是预发布；`draft`（未公开）≠ `prerelease`（已公开但非生产可用），别互相替代
 - 重复创建 Release 只当幂等成功、不核对旧标记 → Gitea 返回 `409`、GitHub 返回 `422 already_exists`；重新 POST 不会改旧值，标记错了须 `PATCH /repos/{owner}/{repo}/releases/{id}` 更新 `prerelease`
-- 带 `git push` 回推的 workflow 用 `cancel-in-progress: true` 或各用不同 `group` 名 → 取消丢提交 / 照样 push 冲突；须多个 workflow 共用同一 `group` 名 + `cancel-in-progress: false` 排队（见 `ci-cd-practices.md`「多 workflow 回推排队」）
+- 带 `git push` 回推的 workflow 用 `cancel-in-progress: true` 或各用不同 `group` 名 → 取消丢提交 / 照样 push 冲突；GitHub 须共用同一 `group` 名，并配 `queue: max` + `cancel-in-progress: false`（默认 `queue: single` 只保留一个 pending，新触发会替换旧 pending，不是可靠队列）。Gitea 28.4 不支持 `queue`，`cancel-in-progress: false` 同样只保留一个 pending，不能靠多个待跑任务排队；回推仍须 `git pull --rebase` 并处理失败重试（见 `ci-cd-practices.md`「多 workflow 回推排队」）
 
 ## 发版（CD）落地清单
 
