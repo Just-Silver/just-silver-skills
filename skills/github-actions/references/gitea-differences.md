@@ -56,7 +56,7 @@
 
 - Gitea 28.4 支持 workflow 级与 job 级 `concurrency` 的 `group` / `cancel-in-progress`（含表达式），同名 group 跨 workflow 互斥
 - **不支持 `queue`**（`single` / `max` 均无；`queue: max` 仍是 open proposal，go-gitea/gitea#39195）。行为等同 GitHub 默认 `queue: single`：running 不被取消，只保留一个 pending，新 pending 替换旧 pending
-- **实测（2026-11-20，Gitea 28.x + Runner 6.0.0，临时仓库）**：`queue: max` 被接受但不生效；连续触发 3 次，只保留 1 个 running + 1 个 pending，中间 pending 被取消，最后一个 pending 在 running 结束后才执行——确认不能照搬 GitHub `queue: max`
+- **实测（2026-11-20，Gitea 28.4.0 + Runner 6.0.0，临时仓库）**：`queue: max` 被接受但不生效；连续触发 3 次，只保留 1 个 running + 1 个 pending，中间 pending 被取消，最后一个 pending 在 running 结束后才执行——确认不能照搬 GitHub `queue: max`
 - Gitea 目标不要写 `queue: max` 期待多 pending；需要多个回推串行时合并 workflow 或自行重试（见 `ci-cd-practices.md`「多 workflow 回推排队」）
 
 ## 行为差异（写法相同、表现不同）
@@ -124,7 +124,7 @@
 > **CHANGELOG 驱动（强制）**：禁止用 `git log PREV_TAG..HEAD` 直拼 Release body 冒充 CHANGELOG（见 `changelog-conventions.md`「糟糕实践」）；`CHANGELOG 是发版的输入`（`ci-cd-practices.md` 标准 CD 全流程 ③），CD 必须从 `CHANGELOG.md` 该版本小节提取。示例仓库需先有 `CHANGELOG.md`（含 `## [Unreleased]`，发版前整理为 `## [x.y.z] - YYYY-MM-DD`；预发布为 `## [x.y.z-rc.N] - YYYY-MM-DD`）——版本一致性 `tag == CHANGELOG == 包清单版本` 进流水线，不一致即失败（见 `changelog-conventions.md` 一致性卡点；**单一版本源仓**前提，monorepo/多制品按各自版本源）。
 
 - **触发**：`on.push.tags: ['v*']`（打 tag 发版），发版 job 用 `if: startsWith(github.ref, 'refs/tags/v')` 兜底。`workflow_dispatch` 的 ref 是分支，**不能**把分支名当 tag 发布；要手动补发时用原 tag run 的 re-run，或单独定义 `tag` 输入并让校验与发布统一使用该输入。
-- **实测（2026-11-20，Gitea 28.x + Runner 6.0.0）**：tag push 触发本模板成功创建 Release（body 为 `CHANGELOG.md` 对应小节，`prerelease=false`）；在 `main` 上 `workflow_dispatch` 时整个 release job 为 `skipped`，后续发布步骤没有执行。
+- **实测（2026-11-20，Gitea 28.4.0 + Runner 6.0.0）**：tag push 触发本模板成功创建 Release（body 为 `CHANGELOG.md` 对应小节，`prerelease=false`）；在 `main` 上 `workflow_dispatch` 时整个 release job 为 `skipped`，后续发布步骤没有执行。
 - **`permissions.contents: write`** 足够（兼容 Gitea `releases: write`）
 - **动态拼接（零硬编码，推荐）**：`github.server_url` + `github.repository` + `github.ref_name`（`github.*` 完全等同 `gitea.*`，且可过 actionlint；`gitea.*` 会报 `undefined variable "gitea"`）
   ```yaml
