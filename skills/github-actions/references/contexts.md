@@ -1,7 +1,6 @@
 # 上下文（Contexts，GitHub Actions）
 
 > 官方源：https://docs.github.com/en/actions/reference/workflows-and-actions/contexts
-> 本文件为提炼要点，完整属性清单以官方页为准。
 
 ## 可用上下文一览
 
@@ -36,7 +35,7 @@
 | `github.sha` | 触发提交 SHA |
 | `github.repository` | `owner/repo`（Gitea 上等同 `gitea.repository`） |
 | `github.repository_owner` | owner 用户名 |
-| `github.server_url` | 实例根 URL（如 `https://gitea.example.com`，Gitea 上等同 `gitea.server_url`，用于拼接 API 地址，禁止硬编码 `server:3500`） |
+| `github.server_url` | 实例根 URL（如 `https://gitea.example.com`，Gitea 上等同 `gitea.server_url`，用于拼接 API 地址） |
 | `github.api_url` | API 根 URL（如 `https://gitea.example.com/api/v1`，Gitea 上等同 `gitea.api_url`） |
 | `github.actor` | 触发用户 |
 | `github.event_name` | 触发事件名（`push` / `pull_request` 等） |

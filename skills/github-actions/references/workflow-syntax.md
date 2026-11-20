@@ -1,7 +1,6 @@
 # Workflow 语法要点（GitHub Actions）
 
 > 官方源：https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax
-> 本文件为提炼要点，官方文档为准；不确定的细节请回查官方源。
 
 ## 基本规则
 
@@ -112,9 +111,9 @@
 
 ### `jobs.<id>.strategy.matrix`
 
-- 定义变体组合：`strategy: { matrix: { os: [ubuntu, windows], node: [18, 20] } }`
+- 定义变体组合：`strategy: { matrix: { os: [ubuntu, windows], node: [22, 24] } }`
 - 引用：`${{ matrix.os }}`、`${{ matrix.node }}`
-- 组合排除：`exclude: [{ os: ubuntu, node: 18 }]`
+- 组合排除：`exclude: [{ os: ubuntu, node: 22 }]`
 - 动态矩阵：`include` + `fromJSON()` 可生成（从其他 job output 传入）
 
 ### `jobs.<id>.steps`
@@ -138,7 +137,7 @@
 | action | 用途 | 常用版本 | 关键参数 |
 |--------|------|---------|----------|
 | `actions/checkout` | 检出仓库代码 | `@v7` | 无 |
-| `actions/setup-node` | 配置 Node 环境 | `@v7` | `node-version`（如 `'20'` 或 `${{ matrix.node }}`） |
+| `actions/setup-node` | 配置 Node 环境 | `@v7` | `node-version`（如 `'22'` 或 `${{ matrix.node }}`） |
 | `actions/setup-python` | 配置 Python 环境 | `@v7` | `python-version` |
 | `actions/setup-go` | 配置 Go 环境 | `@v7` | `go-version` |
 | `actions/upload-artifact` | 上传工件 | `@v7` | `name`、`path` |
@@ -188,7 +187,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [18, 20]   # 用受支持的 LTS 版本（2026 年建议 20+；Node 18 已 EOL）
+        node: [22, 24]   # 当前 LTS
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

@@ -1,7 +1,6 @@
 # 触发事件选型（GitHub Actions）
 
 > 官方源：https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows
-> 本文件为提炼要点，完整事件清单与活动类型以官方页为准。
 
 ## 常用事件速查
 

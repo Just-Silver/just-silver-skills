@@ -1,7 +1,6 @@
 # 表达式与函数（GitHub Actions）
 
 > 官方源：https://docs.github.com/en/actions/reference/workflows-and-actions/expressions
-> 本文件为提炼要点，函数完整签名以官方页为准。
 
 ## 字面量与语法
 
@@ -33,7 +32,6 @@
 | `toJSON(value)` | 转 JSON 字符串（调试输出上下文） | `toJSON(github)` |
 | `fromJSON(value)` | JSON 字符串转对象/值（布尔/数字转换） | `fromJSON('["push","pull_request"]')` |
 | `hashFiles(path)` | 文件集 SHA-256 哈希（缓存 key） | `hashFiles('**/package-lock.json')` |
-| `case(pred1, val1, ..., default)` | 按顺序取第一个为 true 对应的值 | `case(github.ref == 'refs/heads/main', 'prod', 'dev')` |
 
 ## 状态检查函数（if 条件）
 
